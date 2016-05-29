@@ -1,0 +1,6 @@
+# coq files
+*.vo
+*.glob
+*~
+# emacs
+\#~\#
