@@ -1,14 +1,8 @@
 
-(*
-Module Type Frame_Types.
-  Parameter t : Type.
-  Parameter le : t -> t -> Prop.
-End Frame_Types. *)
-
 Section Frame_Definition.
 
   Context {t : Type}.
-  Context { le : t -> t -> Prop }.
+  Context {le : t -> t -> Prop }.
 
   Require Import Coq.Relations.Relation_Definitions.
   Require Import Coq.Classes.Equivalence.
@@ -534,6 +528,19 @@ Section Frame_Definition.
   Qed.
 
   Definition compact := forall u, (V u == ⊤) -> (exists n, partial_V u n == ⊤).
+
+  (* One way to define finite or infinite enumerations would
+     be to use streams, like this:
+
+  CoInductive enumeration (T : Type) :=
+  | ENil : enumeration T
+  | ECons : T -> enumeration T -> enumeration T.
+ 
+  The problem with this definition is that we can't decide
+  whether the enumeration is finite or not.
+  *)
+
+  
 
 End Frame_Definition.
 
