@@ -41,7 +41,7 @@ Section Frame_Definition.
 
         (* distributivity *)
         cdistr_l: forall x u, le (meet x (V u)) (V (fun n => meet x (u n)));
-        cdistr_r: forall x u, le (V (fun n => meet x (u n))) (meet x (V u))
+
       }.
 
   Variable F : @Frame t le.
@@ -73,7 +73,7 @@ Section Frame_Definition.
     apply (le_trans _ y _ H4 H2).
   Qed.
 
-  Definition Feq_equiv := Build_Equivalence t Feq Feq_refl Feq_sym Feq_trans.
+  Definition Feq_equiv := Build_Equivalence Feq Feq_refl Feq_sym Feq_trans.
 
   Add Setoid t Feq Feq_equiv as Feq_setoid.
   Infix "==" := Feq (at level 70).
@@ -86,10 +86,10 @@ Section Frame_Definition.
   Proof.  
     unfold Proper, Feq, respectful.
     firstorder.
-    apply (le_trans _ x _ H1).
+    apply (le_trans _ x _ H2).
     apply (le_trans _ x0 _ H3 H0).
     apply (le_trans _ y _ H).
-    apply (le_trans _ y0 _ H3 H2).
+    apply (le_trans _ y0 _ H3 H1).
   Qed.
 
   Add Morphism le : le_morphism. 
@@ -125,7 +125,7 @@ Section Frame_Definition.
   Proof.
     firstorder.
     apply (join_le _ _ _ _ H H0).
-    apply (join_le _ _ _ _ H1 H2).
+    apply (join_le _ _ _ _ H2 H1).
   Qed.
 
   Lemma join_comm : forall x y, x ∨ y == y ∨ x.
@@ -223,7 +223,7 @@ Section Frame_Definition.
   Proof.
     firstorder.
     apply (meet_le _ _ _ _ H H0).
-    apply (meet_le _ _ _ _ H1 H2).
+    apply (meet_le _ _ _ _ H2 H1).
   Qed.
 
   Lemma meet_comm : forall x y, x ∧ y == y ∧ x.
@@ -466,7 +466,16 @@ Section Frame_Definition.
   Qed.
  
   (* Distributivity *)
-
+  
+  Lemma cdistr_r: forall x u, le (V (fun n => meet x (u n))) (meet x (V u)).
+  Proof.
+    intros.
+    apply v_univ. intro.
+    apply meet_le.
+    apply le_refl.
+    eapply v_le.
+  Qed.
+  
   Lemma cdistr : forall x u, x ∧ (V u) == V (fun n => x ∧ (u n)).
   Proof.
     intros. split.

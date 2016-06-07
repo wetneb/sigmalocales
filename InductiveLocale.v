@@ -10,7 +10,7 @@ Require Import MathClasses.interfaces.orders.
 Require Import MathClasses.interfaces.abstract_algebra.
 Require Import MathClasses.orders.lattices.
 Require Import BijNat.
-
+Require Import Frame.
 
 Section Definition_Inductive_Locale.
 
@@ -21,11 +21,16 @@ Section Definition_Inductive_Locale.
   Variable Tmeet : Meet T.
   Variable Tmsl : MeetSemiLattice T.
   Definition Tle := fun a b => Teq (a ⊓ b) a.
+  Variable Tbot : T.
+  Axiom Tbot_absorb : forall t : T, Teq (Tmeet Tbot t) Tbot.
+  Variable Ttop : T.
+  Axiom Ttop_id : forall t : T, Teq (Tmeet t Ttop) t.
 
   Definition csg_meet : CommutativeSemiGroup T.
   Proof.
     apply meet_semilattice.
     apply Tmsl.
+    Show Proof.
   Defined.
 
   Infix "<=" := Tle (at level 70).
@@ -121,8 +126,20 @@ Section Definition_Inductive_Locale.
     rewrite H. reflexivity.
     rewrite H0. rewrite <- Tmeet_assoc.
     rewrite (Tmeet_idem). reflexivity.
-  Qed.    
+  Qed.
 
+  Lemma Tbot_le : forall t, Tbot <= t.
+  Proof.
+    intro. unfold Tle.
+    apply Tbot_absorb.
+  Qed.
+
+  Lemma Ttop_le : forall t, t <= Ttop.
+  Proof.
+    intro. unfold Tle.
+    apply Ttop_id.
+  Qed.
+    
   Add Morphism Tle : Tle_morphism.
   Proof.
     intros x y H1 u v H2. unfold Tle.
@@ -425,7 +442,7 @@ Section Definition_Inductive_Locale.
   Qed.
 
   (* Universality of meet on coverings for ⩽ *)
-  Proposition Cr_meet_univ : forall U W Z, U ⩽ W -> U ⩽ Z -> U ⩽ W ⊓ Z.
+  Proposition Meet_univ : forall U W Z, Z ⩽ U -> Z ⩽ W -> Z ⩽ U ⊓ W.
   Proof.
     unfold Covrel.
     intros.
@@ -434,7 +451,7 @@ Section Definition_Inductive_Locale.
     apply (H0 n).
   Qed.
 
-  Proposition Cr_meet_l : forall U W, U ⊓ W ⩽ U.
+  Proposition Meet_l : forall U W, U ⊓ W ⩽ U.
   Proof.
     unfold Covrel.
     intros.
@@ -445,11 +462,11 @@ Section Definition_Inductive_Locale.
     reflexivity.
   Qed.
 
-  Proposition Cr_meet_r : forall U W, U ⊓ W ⩽ W.
+  Proposition Meet_r : forall U W, U ⊓ W ⩽ W.
   Proof.
     intros.
     rewrite Meet_comm.
-    apply Cr_meet_l.
+    apply Meet_l.
   Qed.
   
   (**********************)
@@ -480,7 +497,7 @@ Section Definition_Inductive_Locale.
     split ; apply cov_inj_Covrel ; apply Join_cov_inj_comm.
   Qed.
 
-  Lemma Join_le_l : forall U W, U ⩽ U ⊔ W.
+  Lemma Join_l : forall U W, U ⩽ U ⊔ W.
   Proof.
     intros.
     apply cov_inj_Covrel.
@@ -490,11 +507,11 @@ Section Definition_Inductive_Locale.
     rewrite bijNpN_bij2. reflexivity.
   Qed.
 
-  Lemma Join_le_r : forall U W, W ⩽ U ⊔ W.
+  Lemma Join_r : forall U W, W ⩽ U ⊔ W.
   Proof.
     intros.
     rewrite Join_comm.
-    apply Join_le_l.
+    apply Join_l.
   Qed.
 
   Lemma Join_univ : forall U W Z, U ⩽ Z -> W ⩽ Z -> U ⊔ W ⩽ Z.
@@ -510,8 +527,8 @@ Section Definition_Inductive_Locale.
     intros.
     apply Join_univ.
     apply Covrel_trans with (y := W) ; auto.
-    apply Join_le_l.
-    apply Join_le_r.
+    apply Join_l.
+    apply Join_r.
   Qed.
 
   Lemma Join_compat_le_r : forall U W Z, U ⩽ W -> Z ⊔ U ⩽ Z ⊔ W.
@@ -553,16 +570,70 @@ Section Definition_Inductive_Locale.
   (* Distributivity *)
   (******************)
 
-  Lemma Meet_V_down : forall U a, a ↓ V U = V (fun n => a ↓ U n).
-  Proof.
-    intros.
-    admit.
-  Admitted.
-
-  Lemma Cdistr_l : forall U a, a ⊓ V U ⩽ V (fun n => a ⊓ U n).
+  Lemma Cdistr_l : forall a U, a ⊓ V U ⩽ V (fun n => a ⊓ U n).
   Proof.
     intros.
     unfold Meet, Covrel. intro.
-    
-    
+    apply cr_trans with (U := (a (bijNN1 n) ↓ (V U))).
+    apply cr_loc. eapply cr_refl. reflexivity.
+    by_cov_inj.
+    exists (bijNN (bijNN1 n0, bijNN (bijNN1 n, bijNN2 n0))).
+    unfold V, down.
+    repeat (rewrite bijNN1_eq, bijNN2_eq ; simpl).
+    reflexivity.
+  Qed.
+
+  (***************)
+  (* Top, bottom *)
+  (***************)
+
+  Definition Bot : nat -> T := fun n => Tbot.
+  Notation "⊥" := Bot.
+
+  Lemma Bot_le : forall U, ⊥ ⩽ U.
+  Proof.
+    intro.
+    unfold Covrel.
+    intro.
+    apply cr_left with (b := U O).
+    unfold Bot. apply Tbot_le.
+    eapply cr_refl.
+    reflexivity.
+  Qed.
+
+  Definition Top : nat -> T := fun n => Ttop.
+  Lemma Top_le : forall U, U ⩽ Top.
+  Proof.
+    intro.
+    unfold Covrel.
+    intro.
+    apply cr_left with (b := Ttop).
+    apply Ttop_le.
+    apply cr_refl with (n := O).
+    unfold Top. reflexivity.
+  Qed.
+
+  Definition FFrame : @Frame (nat -> T) Covrel :=
+    MkFrame
+      (nat -> T)
+      Covrel
+      Covrel_refl
+      Covrel_trans
+      Top
+      Top_le
+      Bot
+      Bot_le
+      Meet
+      Meet_l
+      Meet_r
+      Meet_univ
+      Join
+      Join_l
+      Join_r
+      Join_univ
+      V
+      V_le
+      V_univ
+      Cdistr_l.
+  
 End Definition_Inductive_Locale.
