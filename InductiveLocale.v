@@ -20,7 +20,7 @@ Section Definition_Inductive_Locale.
   Axiom Tso : Setoid T.
   Variable Tmeet : Meet T.
   Variable Tmsl : MeetSemiLattice T.
-  Definition Tle := default_meet_sl_le.
+  Definition Tle := fun a b => Teq (a ⊓ b) a.
 
   Definition csg_meet : CommutativeSemiGroup T.
   Proof.
@@ -94,13 +94,13 @@ Section Definition_Inductive_Locale.
 
   Lemma Tle_refl : forall a, a <= a.
   Proof.
-    intro. unfold Tle, default_meet_sl_le. rewrite Tmeet_idem. reflexivity.
+    intro. unfold Tle. rewrite Tmeet_idem. reflexivity.
   Qed.
 
   Lemma Tmeet_le_l : forall a b, a ⊓ b <= a.
   Proof.
     intros.
-    unfold Tle, default_meet_sl_le.
+    unfold Tle.
     rewrite Tmeet_comm.
     rewrite <- Tmeet_assoc.
     rewrite Tmeet_idem.
@@ -111,18 +111,25 @@ Section Definition_Inductive_Locale.
   Proof.
     intros.
     (* rewrite comsg_ass *)
-    unfold Tle, default_meet_sl_le.
+    unfold Tle.
     rewrite Tmeet_assoc.
     assert (a ⊓ (c ⊓ b) = c ⊓ a).
     rewrite Tmeet_comm.
     rewrite Tmeet_assoc.
-    unfold Tle, default_meet_sl_le in H.
+    unfold Tle in H.
     rewrite Tmeet_comm in H.
     rewrite H. reflexivity.
     rewrite H0. rewrite <- Tmeet_assoc.
     rewrite (Tmeet_idem). reflexivity.
   Qed.    
 
+  Add Morphism Tle : Tle_morphism.
+  Proof.
+    intros x y H1 u v H2. unfold Tle.
+    split ; intro.
+    rewrite <- H1, <- H2. apply H.
+    rewrite H1, H2. apply H.
+  Qed.
   
   (*******************************************)
   (******* Operations on coverings ***********)
@@ -158,13 +165,13 @@ Section Definition_Inductive_Locale.
     apply (H1 n (Tmeet y (CovAx b i n))).
     rewrite H2 ; reflexivity.
     assert (y <= b).
-    unfold Tle. unfold default_meet_sl_le.
+    unfold Tle.
     rewrite <- H2. apply H.
     apply (cr_inf y U b i H4 H3).
 
     (* cr_left *)
     assert (y <= b).
-    unfold Tle, default_meet_sl_le.
+    unfold Tle.
     rewrite <- H1. apply H.
     apply (cr_left y U b H2).
     apply H0.
@@ -263,6 +270,7 @@ Section Definition_Inductive_Locale.
   Qed.
 
   Definition Coveq_equiv := Build_Equivalence Coveq Coveq_refl Coveq_sym Coveq_trans.
+  Instance Coveq_equiv_ : Equiv (nat -> T) := Coveq.
 
   Add Setoid (nat -> T) Coveq Coveq_equiv as Coveq_setoid.
   Add Morphism Covrel : Covrel_morphism.
@@ -278,6 +286,20 @@ Section Definition_Inductive_Locale.
     apply Covrel_trans with (y := y) ; auto.
     apply Covrel_trans with (y := y0) ; auto.
   Qed.
+
+  Add Morphism covrel : covrel_morphism2.
+  Proof.
+    intros x y Heq U W H.
+    destruct H as [Hl Hr].
+    split ; intro.
+    apply cr_left with (b := x).
+    rewrite Heq ; apply Tle_refl.
+    apply cr_trans with (U := U) ; auto.
+
+    apply cr_left with (b := y).
+    rewrite Heq ; apply Tle_refl.
+    apply cr_trans with (U := W) ; auto.
+  Qed.
   
   (* Injection of a covering into another *)
   Definition cov_inj (U W : nat -> T) :=
@@ -292,6 +314,11 @@ Section Definition_Inductive_Locale.
     apply cr_refl with (n:=m).
     symmetry. exact Heq.
   Qed.
+
+  Ltac by_cov_inj :=
+    try (apply cov_inj_Covrel) ;
+    unfold cov_inj ;
+    intro.
   
   Lemma cr_right : forall a U W, a ◁ U -> cov_inj U W -> a ◁ W.
   Proof.
@@ -301,7 +328,6 @@ Section Definition_Inductive_Locale.
     apply cov_inj_Covrel.
     apply H0.
   Qed.
-  
 
   (******************************************)
   (* Admissibility of the localization rule *)
@@ -319,8 +345,8 @@ Section Definition_Inductive_Locale.
 
     (* cr_inf *)
     apply cr_inf with (b := b0) (i := i).
-    unfold Tle, default_meet_sl_le.
-    unfold Tle, default_meet_sl_le in H.
+    unfold Tle.
+    unfold Tle in H.
     rewrite Tmeet_assoc.
     rewrite H; reflexivity.
     intro n.
@@ -338,25 +364,6 @@ Section Definition_Inductive_Locale.
   (*********************)
   Definition Meet (U : nat -> T) (W : nat -> T) : nat -> T :=
     fun n => Tmeet (U (bijNN1 n)) (W (bijNN2 n)).
-
-  Definition coveq := pointwise_relation nat Teq.
-  Lemma Meet_proper : Proper (coveq ==> coveq ==> coveq) Meet.
-  Proof.
-    unfold Proper, respectful, coveq, pointwise_relation.
-    intros.
-    unfold Meet.
-    specialize (H (bijNN1 a)).
-    rewrite H.
-    specialize (H0 (bijNN2 a)).
-    rewrite H0.
-    reflexivity.
-  Qed.
-
-  (*
-  Add Morphism Meet : Meet_morphism.
-  Proof.
-    apply Meet_proper.
-  Qed. *)
 
   Infix "⊓" := (Meet) (at level 50).
 
@@ -377,6 +384,12 @@ Section Definition_Inductive_Locale.
     unfold Meet.
     rewrite bijNN1_eq, bijNN2_eq. simpl.
     rewrite Tmeet_comm. reflexivity.
+  Qed.
+
+  Lemma Meet_comm : forall U W, U ⊓ W = W ⊓ U.
+  Proof.
+    intros.
+    split ; apply cov_inj_Covrel ; apply Meet_cov_inj_comm.
   Qed.
   
   Lemma Meet_covrel_comm : forall a U W, a ◁ U ⊓ W -> a ◁ W ⊓ U.
@@ -405,8 +418,8 @@ Section Definition_Inductive_Locale.
     apply cr_right with (U := (U p) ↓ W).
     rewrite Tmeet_comm. apply cr_loc. apply TW.
     (* cov_inj *)
-    unfold cov_inj. intro q.
-    exists (bijNN (p,q)).
+    by_cov_inj.
+    exists (bijNN (p,n)).
     unfold Meet. simpl_bijNN.
     unfold down. reflexivity.
   Qed.
@@ -435,5 +448,121 @@ Section Definition_Inductive_Locale.
   Proposition Cr_meet_r : forall U W, U ⊓ W ⩽ W.
   Proof.
     intros.
+    rewrite Meet_comm.
+    apply Cr_meet_l.
+  Qed.
   
+  (**********************)
+  (* Union of coverings *)
+  (**********************)
+
+  Definition Join (U W : nat -> T) :=
+    fun n => match bijNpNinv n with
+            | inl m => U m
+            | inr m => W m
+          end.
+
+  Infix "⊔" := Join (at level 50).
+
+  Lemma Join_cov_inj_comm : forall U W, cov_inj (U ⊔ W) (W ⊔ U).
+  Proof.
+    unfold cov_inj, Join. intros.
+    destruct (bijNpNinv n).
+    exists (bijNpN (inr n0)).
+    rewrite bijNpN_bij2. reflexivity.
+    exists (bijNpN (inl n0)).
+    rewrite bijNpN_bij2. reflexivity.
+  Qed.
+
+  Lemma Join_comm : forall U W, U ⊔ W = W ⊔ U.
+  Proof.
+    intros.
+    split ; apply cov_inj_Covrel ; apply Join_cov_inj_comm.
+  Qed.
+
+  Lemma Join_le_l : forall U W, U ⩽ U ⊔ W.
+  Proof.
+    intros.
+    apply cov_inj_Covrel.
+    by_cov_inj.
+    exists (bijNpN (inl n)).
+    unfold Join.
+    rewrite bijNpN_bij2. reflexivity.
+  Qed.
+
+  Lemma Join_le_r : forall U W, W ⩽ U ⊔ W.
+  Proof.
+    intros.
+    rewrite Join_comm.
+    apply Join_le_l.
+  Qed.
+
+  Lemma Join_univ : forall U W Z, U ⩽ Z -> W ⩽ Z -> U ⊔ W ⩽ Z.
+  Proof.
+    intros.
+    unfold Covrel ; intro.
+    unfold Join ; destruct (bijNpNinv n) ;
+    eapply cr_trans ; auto ; apply Covrel_refl.
+  Qed.
+
+  Lemma Join_compat_le_l : forall U W Z, U ⩽ W -> U ⊔ Z ⩽ W ⊔ Z.
+  Proof.
+    intros.
+    apply Join_univ.
+    apply Covrel_trans with (y := W) ; auto.
+    apply Join_le_l.
+    apply Join_le_r.
+  Qed.
+
+  Lemma Join_compat_le_r : forall U W Z, U ⩽ W -> Z ⊔ U ⩽ Z ⊔ W.
+  Proof.
+    intros.
+    rewrite (Join_comm Z U).
+    rewrite (Join_comm Z W).
+    apply Join_compat_le_l ; assumption.
+  Qed.
+
+  (*******************)
+  (* Contable join ! *)
+  (*******************)
+
+  Definition V (U : nat -> nat -> T) :=
+    fun n => U (bijNN1 n) (bijNN2 n).
+
+  Lemma V_le : forall U n, U n ⩽ V U.
+  Proof.
+    intros.
+    by_cov_inj.
+    exists (bijNN (n,n0)).
+    unfold V.
+    rewrite bijNN1_eq, bijNN2_eq.
+    reflexivity.
+  Qed.
+
+  Lemma V_univ : forall U v, (forall n, U n ⩽ v) -> V U ⩽ v.
+  Proof.
+    intros.
+    unfold V, Covrel.
+    intro.
+    eapply cr_trans.
+    eapply cr_refl. reflexivity.
+    eapply H.
+  Qed.
+
+  (******************)
+  (* Distributivity *)
+  (******************)
+
+  Lemma Meet_V_down : forall U a, a ↓ V U = V (fun n => a ↓ U n).
+  Proof.
+    intros.
+    admit.
+  Admitted.
+
+  Lemma Cdistr_l : forall U a, a ⊓ V U ⩽ V (fun n => a ⊓ U n).
+  Proof.
+    intros.
+    unfold Meet, Covrel. intro.
+    
+    
 End Definition_Inductive_Locale.
