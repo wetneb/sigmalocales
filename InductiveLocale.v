@@ -27,7 +27,7 @@ Section Definition_Inductive_Locale.
     apply meet_semilattice.
     apply Tmsl.
   Defined.
-  
+
   Infix "<=" := Tle (at level 70).
   
   (* For each generator, an index set for its coverings *)
@@ -61,6 +61,68 @@ Section Definition_Inductive_Locale.
     trivial.
   Qed.
 (*  Add Parametric Morphism : Idx with signature (Teq ==> CRelationClasses.arrow) as Idx_fmor. *)
+
+  (************************************************)
+  (* Lemmas on the meet on generators *)
+  (************************************)
+
+  Lemma Tmeet_assoc : forall a b c, (a ⊓ b) ⊓ c = a ⊓ (b ⊓ c).
+  Proof.
+    intros.
+    symmetry.
+    apply sg_ass.
+    apply comsg_setoid.
+    apply semilattice_sg.
+    apply meet_semilattice.
+    exact Tmsl.
+  Qed.
+
+  Lemma Tmeet_comm : forall a b, a ⊓ b = b ⊓ a.
+  Proof.
+    intros.
+    apply comsg_ass.
+    apply meet_semilattice.
+    exact Tmsl.
+  Qed.
+
+  Lemma Tmeet_idem : forall a, a ⊓ a = a.
+  Proof.
+    intro. apply (idempotency Tmeet).
+    apply meet_semilattice.
+    exact Tmsl.
+  Qed.
+
+  Lemma Tle_refl : forall a, a <= a.
+  Proof.
+    intro. unfold Tle, default_meet_sl_le. rewrite Tmeet_idem. reflexivity.
+  Qed.
+
+  Lemma Tmeet_le_l : forall a b, a ⊓ b <= a.
+  Proof.
+    intros.
+    unfold Tle, default_meet_sl_le.
+    rewrite Tmeet_comm.
+    rewrite <- Tmeet_assoc.
+    rewrite Tmeet_idem.
+    reflexivity.
+  Qed.
+
+  Lemma Tmeet_le_r : forall a b c, a <= b -> c ⊓ a <= c ⊓ b.
+  Proof.
+    intros.
+    (* rewrite comsg_ass *)
+    unfold Tle, default_meet_sl_le.
+    rewrite Tmeet_assoc.
+    assert (a ⊓ (c ⊓ b) = c ⊓ a).
+    rewrite Tmeet_comm.
+    rewrite Tmeet_assoc.
+    unfold Tle, default_meet_sl_le in H.
+    rewrite Tmeet_comm in H.
+    rewrite H. reflexivity.
+    rewrite H0. rewrite <- Tmeet_assoc.
+    rewrite (Tmeet_idem). reflexivity.
+  Qed.    
+
   
   (*******************************************)
   (******* Operations on coverings ***********)
@@ -125,11 +187,18 @@ Section Definition_Inductive_Locale.
   Proof.
     intros. apply covrel_proper. apply H. reflexivity.
   Qed.
+
+  
+  (**********************************************)
+  (* Preorder and equivalence between coverings *)
+  (**********************************************)
   
   Definition Covrel (U : nat -> T) (V : nat -> T) :=
     forall n : nat, (U n) ◁ V.
 
-  Lemma cr_trans : forall (a : T) (U W : nat -> T), a ◁ U -> Covrel U W -> a ◁ W.
+  Infix "⩽" := Covrel (at level 60).
+
+  Lemma cr_trans : forall (a : T) (U W : nat -> T), a ◁ U -> U ⩽ W -> a ◁ W.
   Proof.
     intros a U W CR.
     generalize W ; clear W.
@@ -150,68 +219,93 @@ Section Definition_Inductive_Locale.
     apply IHCR ; apply H0.
   Qed.
 
+  Lemma Covrel_refl : Reflexive Covrel.
+  Proof.
+    unfold Reflexive.
+    intros.
+    unfold Covrel.
+    intro. apply cr_refl with (n:=n).
+    reflexivity.
+  Qed.
+    
+  Lemma Covrel_trans : Transitive Covrel.
+  Proof.
+    unfold Transitive.
+    intros.
+    unfold Covrel; intro.
+    apply cr_trans with (U := y).
+    apply (H n). apply H0.
+  Qed.
+
+  (* TODO refactor this into an independent file *)
+  (* We use it everywhere already *)
+  Definition Coveq (U V : nat -> T) := U ⩽ V /\ V ⩽ U.
+
+  Lemma Coveq_refl : Reflexive Coveq.
+  Proof.
+    unfold Reflexive ; intro.
+    unfold Coveq ; split ; apply Covrel_refl.
+  Qed.
+
+  Lemma Coveq_trans : Transitive Coveq.
+  Proof.
+    unfold Transitive, Coveq ; intros.
+    destruct H, H0.
+    split ; apply Covrel_trans with (y := y).
+    apply H. apply H0. apply H2. apply H1.
+  Qed.
+
+  Lemma Coveq_sym : Symmetric Coveq.
+  Proof.
+    unfold Symmetric, Coveq ; intros.
+    destruct H ; split.
+    apply H0. apply H.
+  Qed.
+
+  Definition Coveq_equiv := Build_Equivalence Coveq Coveq_refl Coveq_sym Coveq_trans.
+
+  Add Setoid (nat -> T) Coveq Coveq_equiv as Coveq_setoid.
+  Add Morphism Covrel : Covrel_morphism.
+  Proof.
+    unfold Coveq.
+    intros.
+    destruct H, H0.
+    split.
+    intro.
+    apply Covrel_trans with (y := x) ; auto.
+    apply Covrel_trans with (y := x0) ; auto.
+    intro.
+    apply Covrel_trans with (y := y) ; auto.
+    apply Covrel_trans with (y := y0) ; auto.
+  Qed.
+  
   (* Injection of a covering into another *)
   Definition cov_inj (U W : nat -> T) :=
     forall n, exists m, U n = W m.
 
+  Lemma cov_inj_Covrel : forall U W, cov_inj U W -> U ⩽ W.
+  Proof.
+    intros.
+    unfold Covrel ; intro.
+    unfold cov_inj in H.
+    destruct (H n) as [m Heq].
+    apply cr_refl with (n:=m).
+    symmetry. exact Heq.
+  Qed.
+  
   Lemma cr_right : forall a U W, a ◁ U -> cov_inj U W -> a ◁ W.
   Proof.
     intros.
     apply cr_trans with (U := U).
     apply H.
-    unfold Covrel ; intro.
-    unfold cov_inj in H0.
-    destruct (H0 n) as [m Heq].
-    apply cr_refl with (n:=m).
-    symmetry. exact Heq.
+    apply cov_inj_Covrel.
+    apply H0.
   Qed.
+  
 
   (******************************************)
   (* Admissibility of the localization rule *)
   (******************************************)
-
-  Lemma Tmeet_assoc : forall a b c, (a ⊓ b) ⊓ c = a ⊓ (b ⊓ c).
-  Proof.
-    intros.
-    symmetry.
-    apply sg_ass.
-    apply comsg_setoid.
-    apply semilattice_sg.
-    apply meet_semilattice.
-    exact Tmsl.
-  Qed.
-
-  Lemma Tmeet_comm : forall a b, a ⊓ b = b ⊓ a.
-  Proof.
-    intros.
-    apply comsg_ass.
-    apply meet_semilattice.
-    exact Tmsl.
-  Qed.
-
-  Lemma Tmeet_idem : forall a, a ⊓ a = a.
-  Proof.
-    intro. apply (idempotency Tmeet).
-    apply meet_semilattice.
-    exact Tmsl.
-  Qed.
-    
-
-  Lemma Tmeet_le_r : forall a b c, a <= b -> c ⊓ a <= c ⊓ b.
-  Proof.
-    intros.
-    (* rewrite comsg_ass *)
-    unfold Tle, default_meet_sl_le.
-    rewrite Tmeet_assoc.
-    assert (a ⊓ (c ⊓ b) = c ⊓ a).
-    rewrite Tmeet_comm.
-    rewrite Tmeet_assoc.
-    unfold Tle, default_meet_sl_le in H.
-    rewrite Tmeet_comm in H.
-    rewrite H. reflexivity.
-    rewrite H0. rewrite <- Tmeet_assoc.
-    rewrite (Tmeet_idem). reflexivity.
-  Qed.    
   
   Proposition cr_loc : forall a b U, a ◁ U -> Tmeet b a ◁ b ↓ U.
   Proof.
@@ -257,11 +351,12 @@ Section Definition_Inductive_Locale.
     rewrite H0.
     reflexivity.
   Qed.
-  
+
+  (*
   Add Morphism Meet : Meet_morphism.
   Proof.
     apply Meet_proper.
-  Qed.
+  Qed. *)
 
   Infix "⊓" := (Meet) (at level 50).
 
@@ -273,11 +368,9 @@ Section Definition_Inductive_Locale.
     simpl_bijNN.
 
   (* Commutativity of meet *)
-  Lemma Meet_covrel_comm : forall a U W, a ◁ U ⊓ W -> a ◁ W ⊓ U.
+  Lemma Meet_cov_inj_comm : forall U W, cov_inj (U ⊓ W) (W ⊓ U).
   Proof.
     intros.
-    apply cr_right with (U := U ⊓ W).
-    apply H.
     unfold cov_inj.
     intro.
     exists (bijNN (bijNN2 n,bijNN1 n)).
@@ -285,75 +378,62 @@ Section Definition_Inductive_Locale.
     rewrite bijNN1_eq, bijNN2_eq. simpl.
     rewrite Tmeet_comm. reflexivity.
   Qed.
-
-  Lemma cr_refl_cr_inf :
-    forall a b U W, forall i : Idx b, a <= b ->
-                            (forall n, Tmeet a (CovAx b i n) ◁ W) ->
-                            forall m, (U m) = a ->
-                                 a ◁ U ⊓ W.
+  
+  Lemma Meet_covrel_comm : forall a U W, a ◁ U ⊓ W -> a ◁ W ⊓ U.
   Proof.
     intros.
-    apply cr_inf with (b := b) (i := i).
+    apply cr_right with (U := U ⊓ W).
     apply H.
-    intro n.
-    apply cr_right with (U := a ↓ W).
-    assert ((Tmeet a (Tmeet a (CovAx b i n))) ◁ a ↓ W).
-    apply cr_loc ; apply (H0 n).
-    rewrite <- Tmeet_assoc in H2.
-    rewrite Tmeet_idem in H2.
-    apply H2.
-    (* cov_inj *)
-    unfold cov_inj ; intros p.
-    exists (bijNN (m,p)).
-    unfold Meet. simpl_bijNN.
-    unfold down. rewrite H1. reflexivity.
+    apply Meet_cov_inj_comm.
   Qed.
-
   
   (* Admissibility of the meet rule *)
   Proposition cr_meet : forall a U W, a ◁ U -> a ◁ W -> a ◁ U ⊓ W.
   Proof.
     intros a U W TU TW.
 
-    induction TU as [a | a | a].
+    assert (Tmeet a a ◁ a ↓ U).
+    apply (cr_loc a a U TU).
+    rewrite Tmeet_idem in H.
 
-    (***** cr_refl ******)
-    induction TW as [ a W| a W | a W].
-
-    (* cr_refl, cr_refl *)
-    Meet_refl n n0.
-    rewrite H, H0. rewrite (idempotency Tmeet a).
-    reflexivity.
-
-    (* cr_refl, cr_inf *)
-    About cr_refl_cr_inf.
-    apply (cr_refl_cr_inf a b U W i H0 H1 n H).
+    apply cr_trans with (U := a ↓ U).
+    apply H.
     
-    (* cr_refl, cr_left *)
-    apply cr_trans with (U := a ↓ W).
-    (* a ◁ a ↓ W *)
-    unfold Tle, default_meet_sl_le in H0.
-    assert (Tmeet a b ◁ a ↓ W).
-    apply cr_loc ; apply TW.
-    rewrite H0 in H1.
-    apply H1.
     (* Covrel *)
-    unfold Covrel. intro. unfold down.
-    Meet_refl n n0.
-    rewrite H. reflexivity.
+    unfold Covrel. intros p.
+    unfold down.
+    apply cr_right with (U := (U p) ↓ W).
+    rewrite Tmeet_comm. apply cr_loc. apply TW.
+    (* cov_inj *)
+    unfold cov_inj. intro q.
+    exists (bijNN (p,q)).
+    unfold Meet. simpl_bijNN.
+    unfold down. reflexivity.
+  Qed.
 
-    (******* cr_inf *******)
-    induction TW as [a | a | a].
+  (* Universality of meet on coverings for ⩽ *)
+  Proposition Cr_meet_univ : forall U W Z, U ⩽ W -> U ⩽ Z -> U ⩽ W ⊓ Z.
+  Proof.
+    unfold Covrel.
+    intros.
+    apply cr_meet.
+    apply (H n).
+    apply (H0 n).
+  Qed.
 
-    (* cr_inf, cr_refl *)
-    apply Meet_covrel_comm.
-    About cr_refl_cr_inf.
-    apply (cr_refl_cr_inf a b U0 U i H H0 n H2).
-    
-    (* cr_inf, cr_inf *)
-    (* TODO *)
-    
+  Proposition Cr_meet_l : forall U W, U ⊓ W ⩽ U.
+  Proof.
+    unfold Covrel.
+    intros.
+    unfold Meet.
+    apply cr_left with (b := U (bijNN1 n)).
+    apply Tmeet_le_l.
+    apply cr_refl with (n := bijNN1 n).
+    reflexivity.
+  Qed.
 
-    (******* cr_left ******)
+  Proposition Cr_meet_r : forall U W, U ⊓ W ⩽ W.
+  Proof.
+    intros.
   
 End Definition_Inductive_Locale.
