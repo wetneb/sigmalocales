@@ -1,14 +1,15 @@
 Require Import InductiveLocale.
 Require Import List.
 Require Import Bool.
+Require Import MathClasses.interfaces.canonical_names.
 
-Lemma eqb_sym : forall a b, eqb a b = eqb b a.
+Lemma eqb_sym : forall a b, eqb a b ≡ eqb b a.
 Proof.
   intros.
   destruct a, b ; reflexivity.
 Qed.
 
-Lemma bool_dec_refl : forall a, bool_dec a a = left (eq_refl a).
+Lemma bool_dec_refl : forall a, bool_dec a a ≡ left (eq_refl a).
 Proof.
   intro a.
   destruct a ; reflexivity.
@@ -16,7 +17,6 @@ Qed.
 
 Section CantorLocale.
   Open Scope list_scope.
-  Check  true :: nil.
 
   (* Our generators for the Cantor locale are *)
   Inductive T :=
@@ -25,6 +25,12 @@ Section CantorLocale.
   (* Cyl s represents the set of infinite sequences *)
   (* beginning with s *)
 
+  Definition bcons (h : bool) (t : T) :=
+    match t with
+      | Bot => Bot
+      | Cyl t => Cyl (h :: t)
+    end.
+  
   (* We define the meet on these generators. First, *)
   (* we define it on strings only (ignoring Bot for the moment *)
   Fixpoint mbword (a b : list bool) :=
@@ -48,7 +54,7 @@ Section CantorLocale.
 
   Infix "♮" := mbword (at level 40).
 
-  Proposition mbword_comm : forall a b, a ♮ b = b ♮ a.
+  Proposition mbword_comm : forall a b, a ♮ b ≡ b ♮ a.
   Proof.
     intro.
     induction a as [|ha ta].
@@ -100,6 +106,38 @@ Section CantorLocale.
     apply IHta with (b := b0) ; assumption.
   Qed.
 
+  (* Order relation on the generators *)
+  Inductive Tle : forall (a b : T), Prop :=
+  | le_Bot : forall a, Tle Bot a
+  | le_Pref : forall a b, a ⪯ b -> Tle (Cyl b) (Cyl a).
+
+  Instance Le_T : Le T := Tle.
+  
+  Lemma Tle_refl : forall a, a ≤ a.
+  Proof.
+    induction a.
+    apply le_Bot.
+    apply le_Pref.
+    apply isprefix_refl.
+  Qed.
+
+  Ltac solve_Tle :=
+    match goal with
+      | [ |- Bot ≤ ?a ] => apply le_Bot
+      | [ H : Cyl ?a ≤ Bot |- _ ] => inversion H
+      | [ H : ?a ⪯ ?b |- Cyl ?b ≤ Cyl ?a ] => apply (le_Pref a b H)
+    end.
+
+  Lemma Tle_trans : forall a b c, a ≤ b -> b ≤ c -> a ≤ c.
+  Proof.
+    intros.
+    destruct a, b, c ; try solve_Tle.
+    inversion H ; inversion H0. subst.
+    apply le_Pref.
+    apply isprefix_trans with (b := l0).
+    assumption. assumption.
+  Qed.
+
   Lemma isprefix_ntrans1 : forall a b c, a ⪯ b -> a ⊀ c -> b ⊀ c.
   Proof.
     intros.
@@ -132,7 +170,7 @@ Section CantorLocale.
     right ; intro. inversion H. apply (n H3).
   Qed.
 
-  Lemma isprefix_antisym : forall a b, a ⪯ b -> b ⪯ a -> a = b.
+  Lemma isprefix_antisym : forall a b, a ⪯ b -> b ⪯ a -> a ≡ b.
   Proof.
     induction a ; intros ; destruct b.
     reflexivity.
@@ -159,7 +197,7 @@ Section CantorLocale.
     right ; eapply isprefix_cons ; assumption.
   Qed.
   
-  Lemma isprefix_mbword : forall a b, a ⪯ b -> a ♮ b = Cyl b.
+  Lemma isprefix_mbword : forall a b, a ⪯ b -> a ♮ b ≡ Cyl b.
   Proof.
     intro a.
     induction a as [|ha ta] ; intros.
@@ -177,7 +215,7 @@ Section CantorLocale.
       reflexivity.
   Qed.
 
-  Lemma mbword_case : forall a b, a ♮ b = Bot \/ a ⪯ b \/ b ⪯ a.
+  Lemma mbword_case : forall a b, a ♮ b ≡ Bot \/ a ⪯ b \/ b ⪯ a.
   Proof.
     induction a as [|ha ta] ; intros.
     - (* nil *)
@@ -206,26 +244,24 @@ Section CantorLocale.
   Qed.
 
   (* We now define the meet on the generators *)
-  Definition meet (a b : T) :=
+  Definition Tmeet (a b : T) :=
     match a, b with
       | Bot, _ => Bot
       | _, Bot => Bot
       | Cyl a', Cyl b' => mbword a' b'
     end.
 
-  Infix "∩" := meet (at level 60).
-
-  (* Lemmas on the meet *)
-  (* We need it to be a commutative semigroup *)
-
-  Proposition meet_comm : forall a b, a ∩ b = b ∩ a.
+  Instance Tmeet_meet : Meet T := Tmeet.
+  
+  Proposition meet_comm : forall a b:T, a ⊓ b ≡ b ⊓ a.
   Proof.
-    intros. unfold meet.
-    destruct a, b ; auto ; try (rewrite mbword_comm).
+    intros. unfold meet, Tmeet_meet, Tmeet.
+    destruct a, b ; auto.
+    rewrite mbword_comm.
     reflexivity.
   Qed.
 
-  Proposition meet_case : forall a b, a ∩ b = Bot \/ a ∩ b = a \/ a ∩ b = b.
+  Proposition meet_case : forall a b, a ⊓ b ≡ Bot \/ a ⊓ b ≡ a \/ a ⊓ b ≡ b.
   Proof.
     intros.
     destruct a as [|a] ; destruct b as [|b] ; auto.
@@ -242,54 +278,62 @@ Section CantorLocale.
   Qed.
 
   Lemma meet_ind : forall x a b u,
-                     a ♮ b = Cyl u ->
-                     Cyl (x :: a) ∩ Cyl (x :: b) = Cyl (x :: u).
+                     a ♮ b ≡ Cyl u ->
+                     Cyl (x :: a) ⊓ Cyl (x :: b) ≡ Cyl (x :: u).
   Proof.
     intros.
-    unfold meet, mbword.
+    unfold meet, Tmeet_meet, Tmeet, mbword.
     unfold mbword in H.
     rewrite bool_dec_refl, H.
     reflexivity.
   Qed.
 
   Definition Top := Cyl nil.
-  Proposition Cnil_unit_l : forall a, Top ∩ a = a.
+  Proposition Cnil_unit_l : forall a, Top ⊓ a ≡ a.
   Proof.
     intros.
-    unfold Top, meet.
+    unfold Top, meet, Tmeet_meet, Tmeet.
     destruct a ; auto.
   Qed.
   
-  Proposition Cnil_unit_r : forall a, a ∩ Top = a.
+  Proposition Cnil_unit_r : forall a, a ⊓ Top ≡ a.
   Proof.
     intros.
     rewrite meet_comm.
     apply Cnil_unit_l.
   Qed.
 
-  Proposition Cnil_Bot_l : forall a, Bot ∩ a = Bot.
+  Proposition Cnil_Bot_l : forall a, Bot ⊓ a ≡ Bot.
   Proof.
     auto.
   Qed.
 
-  Proposition Cnil_Bot_r : forall a, a ∩ Bot = Bot.
+  Proposition Cnil_Bot_r : forall a, a ⊓ Bot ≡ Bot.
   Proof.
     intros.
     rewrite meet_comm.
     apply Cnil_Bot_l.
   Qed.
+
+  Lemma Top_le : forall a, a ≤ Top.
+  Proof.
+    intro. destruct a.
+    apply le_Bot.
+    apply le_Pref.
+    apply isprefix_nil.
+  Qed.
   
   Hint Rewrite Cnil_unit_l Cnil_unit_r Cnil_Bot_l Cnil_Bot_r.
 
-  Lemma isprefix_meet : forall a b, a ⪯ b -> Cyl a ∩ Cyl b = Cyl b.
+  Lemma isprefix_meet : forall a b, a ⪯ b -> Cyl a ⊓ Cyl b ≡ Cyl b.
   Proof.
     intros.
     unfold meet.
     apply isprefix_mbword.
     assumption.
   Qed.
-  
-  Proposition meet_idem : forall a, a ∩ a = a.
+
+  Proposition meet_idem : forall a, a ⊓ a ≡ a.
   Proof.
     destruct a as [|a].
     reflexivity.
@@ -298,14 +342,14 @@ Section CantorLocale.
 
   Hint Rewrite meet_idem.
 
-  Lemma isprefix_meet_comm : forall a b, a ⪯ b -> Cyl b ∩ Cyl a = Cyl b.
+  Lemma isprefix_meet_comm : forall a b, a ⪯ b -> Cyl b ⊓ Cyl a ≡ Cyl b.
   Proof.
     intros.
     rewrite meet_comm.
     apply isprefix_meet. assumption.
   Qed.
 
-  Lemma notprefix_bot : forall a b, a ⊀ b -> b ⊀ a -> Cyl a ∩ Cyl b = Bot.
+  Lemma notprefix_bot : forall a b, a ⊀ b -> b ⊀ a -> Cyl a ⊓ Cyl b ≡ Bot.
   Proof.
     intros.
     destruct (mbword_case a b).
@@ -314,81 +358,63 @@ Section CantorLocale.
     destruct H ; assumption.
     destruct H0 ; assumption.
   Qed.
-
-  Ltac prefix_simpl :=
-    match goal with
-      | [ H : ?a ⪯ ?b |- context [ Cyl ?a ∩ Cyl ?b ] ] =>
-        rewrite (isprefix_meet a b H)
-      | [ H : ?a ⪯ ?b |- context [ Cyl ?b ∩ Cyl ?a ] ] =>
-        rewrite (isprefix_meet_comm a b H)
-      | [ H1 : ?a ⊀ ?b, H2 : ?b ⊀ ?a |- context[Cyl ?a ∩ Cyl ?b]] =>
-        rewrite (notprefix_bot a b H1 H2)
-    end.
-
-  Ltac saturate_prec :=
-    match goal with
-      | [ H : ?a ⪯ ?b, H' : ?a ⊀ ?b |- _ ] =>
-        contradiction H'
-      | [ H : ?a ⪯ ?b, H' : ?b ⪯ ?a |- _ ] =>
-        assert (a = b) by (apply (isprefix_antisym a b H H'))
-      | [ H : ?a ⪯ ?b, H' : ?b ⪯ ?c  |- _ ] =>
-        match goal with
-          | [ H3 : a ⪯ c |- _ ] => idtac
-          | _ =>
-           assert (a ⪯ c) by (apply (isprefix_trans a b c H H'))
-        end
-    end ;
-    subst ;
-    match goal with
-      | [ H : ?a ⪯ ?a |- _ ] => clear H
-      | _ => idtac
-    end ;
-    match goal with
-      | [ H : ?a ⪯ ?b, H' : ?a ⊀ ?c |- _ ] =>
-        match goal with
-          | [ H3 : b ⊀ c |- _ ] => idtac
-          | _ =>
-            assert (b ⊀ c) by (apply (isprefix_ntrans1 a b c H H'))
-        end
-      | _ => idtac
-    end ;
-    match goal with
-      | [ H : ?b ⪯ ?c, H' : ?a ⊀ ?c |- _ ] =>
-        match goal with
-          | [ H3 : a ⊀ b |- _ ] => idtac
-          | _ =>
-            assert (a ⊀ b) by (apply (isprefix_ntrans2 a b c H H'))
-        end
-       | _ => idtac
-    end.
-
-  Ltac crush :=
-    repeat (autorewrite with core ; try prefix_simpl) ;
-    auto.
-
-  Ltac case_isprefix a b :=
-    destruct (isprefix_dec b a) ;
-    repeat saturate_prec ;
-    crush.
-
-  Proposition mbword_assoc : forall a b c, a ∩ (b ∩ c) = (a ∩ b) ∩ c.
+  
+  (* Lemmas on the meet *)
+  Lemma Tmeet_le_l : forall a b, a ⊓ b ≤ a.
   Proof.
-    destruct a as [|a] ;
-      destruct b as [|b] ;
-      destruct c as [|c] ; crush.
-    case_isprefix a b ;
-      case_isprefix b a ;
-      case_isprefix a c ;
-      case_isprefix c a ;
-      try (case_isprefix b c) ;
-      try (case_isprefix c b).
-    (* remaining cases *)
-    assert (b ⪯ c \/ c ⪯ b) by (apply (isprefix_common b c a H H1)).
-    destruct H5 ; contradiction.
-    assert (a ⪯ b \/ b ⪯ a) by (apply (isprefix_common a b c H2 H4)).
-    destruct H5 ; contradiction.
- Qed.
+    intros.
+    destruct a, b ; try apply le_Bot.
+    unfold le, Le_T.
+    destruct (isprefix_dec l l0).
+    rewrite (isprefix_meet).
+    apply le_Pref. assumption.
+    assumption.
+    destruct (isprefix_dec l0 l).
+    rewrite meet_comm.
+    rewrite isprefix_meet.
+    apply le_Pref. apply isprefix_refl.
+    assumption.
+    rewrite notprefix_bot. apply le_Bot.
+    assumption. assumption.
+  Qed.
 
+  Lemma Tmeet_le_r : forall a b, a ⊓ b ≤ b.
+  Proof.
+    intros.
+    rewrite meet_comm.
+    apply Tmeet_le_l.
+  Qed.
+
+  Lemma Tmeet_univ : forall a b c, c ≤ a -> c ≤ b -> c ≤ a ⊓ b.
+  Proof.
+    intros.
+    destruct a, b, c ; autorewrite with core ; try solve_Tle.
+    inversion H.
+    inversion H0. subst.
+    destruct (isprefix_common l l0 l1) ; try assumption.
+    rewrite (isprefix_meet l l0 H1).
+    solve_Tle.
+    rewrite (isprefix_meet_comm l0 l H1).
+    solve_Tle.
+  Qed.
+
+  Require Import MeetSemiLattice.
+  Instance CantorMSL : MeetSemiLattice :=
+    MkMSL
+      T
+      Tle
+      Tle_refl
+      Tle_trans
+      Top
+      Top_le
+      Bot
+      le_Bot
+      Tmeet
+      Tmeet_le_l
+      Tmeet_le_r
+      Tmeet_univ.
+
+  
 End CantorLocale.
   
     
