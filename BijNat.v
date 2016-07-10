@@ -370,5 +370,47 @@ Section Bijection_Naturals.
     reflexivity.
   Qed.
 
+  (* Boundedness *)
+
+  Definition greaterNpN (n m : nat) (p : NpN) : Prop :=
+    match p with
+      | inl x => n <= x
+      | inr y => m <= y
+    end.
+
+  Program Fixpoint maxFun (f : nat -> nat) (n : nat) : {m : nat | forall p, p <= n -> f p <= m } :=
+    match n with
+      | O => f O
+      | S n => max (f (S n)) (maxFun f n)
+    end.
+  Obligation 1.
+  inversion H. reflexivity.
+  Defined.
+  Obligation 2.
+  destruct (proj1 (PeanoNat.Nat.le_succ_r _ _) H).
+  apply le_trans with (m := x).
+  apply (l _ H0).
+  apply PeanoNat.Nat.le_max_r.
+  rewrite H0.
+  apply PeanoNat.Nat.le_max_l.
+  Defined.
+
+    
+  Lemma boundedness_NpN : forall n m : nat, exists p, forall k, p <= k -> greaterNpN n m (bijNpNinv k) .
+  Proof.
+    intros.
+    set (a := (maxFun (fun u => bijNpN (inl u))) n).
+    set (b := (maxFun (fun v => bijNpN (inr v))) m).
+    destruct a, b.
+    exists (S (max x x0)).
+    intros.
+    unfold greaterNpN.
+    destruct (bijNpNinv k) eqn:G.
+  
+    SearchAbout ({ _ <= _ } + { _ <= _ }).
+    destruct (le_le_S_dec n n0) ; try assumption.
+    specialize (l (S n0) l1).
+    
+
 End Bijection_Naturals.
 

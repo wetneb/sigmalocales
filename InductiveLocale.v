@@ -9,7 +9,9 @@ Require Import MathClasses.interfaces.canonical_names.
 Require Import BijNat.
 Require Import Frame.
 Require Import MeetSemiLattice.
+Require Import PreorderEquiv.
 Require Import Coq.Classes.RelationClasses.
+Require Import Coq.Lists.List.
 
 Section Definition_Inductive_Locale.
 
@@ -17,41 +19,14 @@ Section Definition_Inductive_Locale.
   Variable T : Type.
   Variable Tle : Le T.
   Variable Tmsl : @MeetSemiLattice T Tle.
-  Existing Instance Fequiv.
+  Existing Instance Feq_equiv.
  
   (* For each generator, an index set for its coverings *)
   Variable Idx : forall t:T, Set.
-  Axiom Idx_proper : forall x y, x = y -> Idx x ≡ Idx y.
-  (* For each generator and index of covering, an index of *)
-  (* Variable CovIdx : forall t:T, forall i:Idx t, Type.
-  set to nat for our purposes
-  *)
+  (* Variable Idx_proper : forall x y, x = y -> Idx x ≡ Idx y. *)
+  (* For each generator and index of covering, an covering *)
   Variable CovAx : forall t:T, forall i:Idx t, (nat -> T).
-  Definition CovAx_rect : forall s t: T, s = t -> Idx s -> Idx t.
-    intros.
-    rewrite  <-(Idx_proper s t H).
-    exact H0.
-  Qed.
-  Axiom CovAx_proper : forall s t:T, forall H : s = t, forall i : Idx s,
-     forall n : nat, (CovAx s i n) = (CovAx t (CovAx_rect s t H i) n).
-
-  (* Setoids *)
-  Add Setoid T Feq (Feq_equiv Tle Tmsl) as setoid_T.
-  Add Morphism Idx : Idx_morphism.
-  Proof.
-    apply Idx_proper.
-  Qed.
-
-  (*
-  Lemma Idx_funny_mor : CMorphisms.Proper (CMorphisms.respectful Teq CRelationClasses.arrow) Idx.
-  Proof.
-    unfold CMorphisms.Proper, CMorphisms.respectful.
-    intros. unfold CRelationClasses.arrow.
-    rewrite (Idx_morphism x y H).
-    trivial.
-  Qed. *)
-(*  Add Parametric Morphism : Idx with signature (Teq ==> CRelationClasses.arrow) as Idx_fmor. *)
-
+  
   (************************************************)
   (* Lemmas on the meet on generators *)
   (************************************)
@@ -63,15 +38,6 @@ Section Definition_Inductive_Locale.
     apply (meet_assoc Tle).
   Qed.
 
-  Add Parametric Morphism: Tle with signature ((=) ==> (=) ==> iff) as Tle_morphism.
-  Proof.
-    apply le_proper.
-  Qed.
-  Add Parametric Morphism: msl_meet with signature ((=) ==> (=) ==> (=)) as Tmeet_morphism.
-  Proof.
-    apply meet_morphism.
-  Qed.
-  
   (*******************************************)
   (******* Operations on coverings ***********)
   (*******************************************)
@@ -84,10 +50,13 @@ Section Definition_Inductive_Locale.
 
   (* Now we can define the inductive topology! *)
   Inductive covrel (a : T) : (nat -> T) -> Prop :=
-  | cr_refl : forall (U : nat -> T) (n : nat), (U n) = a -> covrel a U
+  | cr_refl : forall (U : nat -> T) n, U n = a -> covrel a U
   | cr_inf : forall U : nat -> T, forall b : T, forall i:Idx b, a ≤ b -> (forall n, covrel (a ⊓ (CovAx b i n)) U) -> covrel a U
   | cr_left : forall U : nat -> T, forall b : T, a ≤ b -> covrel b U -> covrel a U.
   Infix "◁" := (covrel) (at level 60).
+
+  Lemma cr_n : forall U n, U n ◁ U.
+  Proof. intros. apply cr_refl with (n := n). reflexivity. Qed.
 
   (* covrel is a morphism *)
   Lemma covrel_Teq : forall x: T, forall U : (nat -> T), (x ◁ U) -> forall y :T,  x = y -> y ◁ U.
@@ -140,10 +109,10 @@ Section Definition_Inductive_Locale.
   
   Definition Covrel (U : nat -> T) (V : nat -> T) :=
     forall n : nat, (U n) ◁ V.
+  Instance Covrel_le : Le (nat -> T) := Covrel.
+  Ltac unfold_Covrel := unfold le, Covrel_le, Covrel.
 
-  Infix "⩽" := Covrel (at level 60).
-
-  Lemma cr_trans : forall (a : T) (U W : nat -> T), a ◁ U -> U ⩽ W -> a ◁ W.
+  Lemma cr_trans : forall (a : T) (U W : nat -> T), a ◁ U -> U ≤ W -> a ◁ W.
   Proof.
     intros a U W CR.
     generalize W ; clear W.
@@ -184,7 +153,7 @@ Section Definition_Inductive_Locale.
 
   (* TODO refactor this into an independent file *)
   (* We use it everywhere already *)
-  Definition Coveq (U V : nat -> T) := U ⩽ V /\ V ⩽ U.
+  Definition Coveq (U V : nat -> T) := U ≤ V /\ V ≤ U.
 
   Lemma Coveq_refl : Reflexive Coveq.
   Proof.
@@ -243,7 +212,7 @@ Section Definition_Inductive_Locale.
   Definition cov_inj (U W : nat -> T) :=
     forall n, exists m, U n = W m.
 
-  Lemma cov_inj_Covrel : forall U W, cov_inj U W -> U ⩽ W.
+  Lemma cov_inj_Covrel : forall U W, cov_inj U W -> U ≤ W.
   Proof.
     intros.
     unfold Covrel ; intro.
@@ -317,28 +286,27 @@ Section Definition_Inductive_Locale.
     unfold cov_inj.
     intro.
     exists (bijNN (bijNN2 n,bijNN1 n)).
-    
+    unfold CMeet.
     simpl_bijNN.
-    rewrite bijNN1_eq, bijNN2_eq. simpl.
     rewrite meet_comm. reflexivity.
   Qed.
-
-  Lemma Meet_comm : forall U W, U ⊓ W = W ⊓ U.
+  
+  Lemma CMeet_comm : forall U W, U ⊓ W = W ⊓ U.
   Proof.
     intros.
-    split ; apply cov_inj_Covrel ; apply Meet_cov_inj_comm.
+    split ; apply cov_inj_Covrel ; apply CMeet_cov_inj_comm.
   Qed.
   
-  Lemma Meet_covrel_comm : forall a U W, a ◁ U ⊓ W -> a ◁ W ⊓ U.
+  Lemma CMeet_covrel_comm : forall a U W, a ◁ U ⊓ W -> a ◁ W ⊓ U.
   Proof.
     intros.
     apply cr_right with (U := U ⊓ W).
     apply H.
-    apply Meet_cov_inj_comm.
+    apply CMeet_cov_inj_comm.
   Qed.
   
   (* Admissibility of the meet rule *)
-  Proposition cr_meet : forall a U W, a ◁ U -> a ◁ W -> a ◁ U ⊓ W.
+  Proposition cr_meet : forall a U W, a ◁ U -> a ◁ W -> a ◁ (CMeet U W).
   Proof.
     intros a U W TU TW.
 
@@ -357,129 +325,60 @@ Section Definition_Inductive_Locale.
     (* cov_inj *)
     by_cov_inj.
     exists (bijNN (p,n)).
-    unfold Meet. simpl_bijNN.
+    unfold CMeet. simpl_bijNN.
     unfold down. reflexivity.
   Qed.
 
-  (* Universality of meet on coverings for ⩽ *)
-  Proposition Meet_univ : forall U W Z, Z ⩽ U -> Z ⩽ W -> Z ⩽ U ⊓ W.
+  (* Universality of meet on coverings for ≤ *)
+  Proposition Meet_univ : forall U W Z : nat -> T,
+                            Z ≤ U -> Z ≤ W -> Z ≤ U ⊓ W.
   Proof.
-    unfold Covrel.
+    unfold_Covrel.
     intros.
     apply cr_meet.
     apply (H n).
     apply (H0 n).
   Qed.
 
-  Proposition Meet_l : forall U W, U ⊓ W ⩽ U.
+  Proposition CMeet_l : forall U W, U ⊓ W ≤ U.
   Proof.
-    unfold Covrel.
+    unfold_Covrel.
     intros.
     unfold Meet.
     apply cr_left with (b := U (bijNN1 n)).
-    apply Tmeet_le_l.
+    apply meet_l.
     apply cr_refl with (n := bijNN1 n).
     reflexivity.
   Qed.
 
-  Proposition Meet_r : forall U W, U ⊓ W ⩽ W.
+  Proposition CMeet_r : forall U W, U ⊓ W ≤ W.
   Proof.
     intros.
-    rewrite Meet_comm.
-    apply Meet_l.
-  Qed.
-  
-  (**********************)
-  (* Union of coverings *)
-  (**********************)
-
-  Definition Join (U W : nat -> T) :=
-    fun n => match bijNpNinv n with
-            | inl m => U m
-            | inr m => W m
-          end.
-
-  Infix "⊔" := Join (at level 50).
-
-  Lemma Join_cov_inj_comm : forall U W, cov_inj (U ⊔ W) (W ⊔ U).
-  Proof.
-    unfold cov_inj, Join. intros.
-    destruct (bijNpNinv n).
-    exists (bijNpN (inr n0)).
-    rewrite bijNpN_bij2. reflexivity.
-    exists (bijNpN (inl n0)).
-    rewrite bijNpN_bij2. reflexivity.
-  Qed.
-
-  Lemma Join_comm : forall U W, U ⊔ W = W ⊔ U.
-  Proof.
-    intros.
-    split ; apply cov_inj_Covrel ; apply Join_cov_inj_comm.
-  Qed.
-
-  Lemma Join_l : forall U W, U ⩽ U ⊔ W.
-  Proof.
-    intros.
-    apply cov_inj_Covrel.
-    by_cov_inj.
-    exists (bijNpN (inl n)).
-    unfold Join.
-    rewrite bijNpN_bij2. reflexivity.
-  Qed.
-
-  Lemma Join_r : forall U W, W ⩽ U ⊔ W.
-  Proof.
-    intros.
-    rewrite Join_comm.
-    apply Join_l.
-  Qed.
-
-  Lemma Join_univ : forall U W Z, U ⩽ Z -> W ⩽ Z -> U ⊔ W ⩽ Z.
-  Proof.
-    intros.
-    unfold Covrel ; intro.
-    unfold Join ; destruct (bijNpNinv n) ;
-    eapply cr_trans ; auto ; apply Covrel_refl.
-  Qed.
-
-  Lemma Join_compat_le_l : forall U W Z, U ⩽ W -> U ⊔ Z ⩽ W ⊔ Z.
-  Proof.
-    intros.
-    apply Join_univ.
-    apply Covrel_trans with (y := W) ; auto.
-    apply Join_l.
-    apply Join_r.
-  Qed.
-
-  Lemma Join_compat_le_r : forall U W Z, U ⩽ W -> Z ⊔ U ⩽ Z ⊔ W.
-  Proof.
-    intros.
-    rewrite (Join_comm Z U).
-    rewrite (Join_comm Z W).
-    apply Join_compat_le_l ; assumption.
+    rewrite CMeet_comm.
+    apply CMeet_l.
   Qed.
 
   (*******************)
   (* Contable join ! *)
   (*******************)
 
-  Definition V (U : nat -> nat -> T) :=
+  Definition Vc (U : nat -> nat -> T) :=
     fun n => U (bijNN1 n) (bijNN2 n).
 
-  Lemma V_le : forall U n, U n ⩽ V U.
+  Lemma V_le : forall U n, U n ≤ Vc U.
   Proof.
     intros.
     by_cov_inj.
     exists (bijNN (n,n0)).
-    unfold V.
+    unfold Vc.
     rewrite bijNN1_eq, bijNN2_eq.
     reflexivity.
   Qed.
 
-  Lemma V_univ : forall U v, (forall n, U n ⩽ v) -> V U ⩽ v.
+  Lemma V_univ : forall U v, (forall n, U n ≤ v) -> Vc U ≤ v.
   Proof.
     intros.
-    unfold V, Covrel.
+    unfold Vc, Covrel.
     intro.
     eapply cr_trans.
     eapply cr_refl. reflexivity.
@@ -490,15 +389,15 @@ Section Definition_Inductive_Locale.
   (* Distributivity *)
   (******************)
 
-  Lemma Cdistr_l : forall a U, a ⊓ V U ⩽ V (fun n => a ⊓ U n).
+  Lemma Cdistr_l : forall a U, a ⊓ (Vc U) ≤ Vc (fun n => a ⊓ (U n)).
   Proof.
     intros.
-    unfold Meet, Covrel. intro.
-    apply cr_trans with (U := (a (bijNN1 n) ↓ (V U))).
+    unfold meet, CMeet_meet, CMeet, Covrel. intro.
+    apply cr_trans with (U := (a (bijNN1 n) ↓ (Vc U))).
     apply cr_loc. eapply cr_refl. reflexivity.
     by_cov_inj.
     exists (bijNN (bijNN1 n0, bijNN (bijNN1 n, bijNN2 n0))).
-    unfold V, down.
+    unfold Vc, down.
     repeat (rewrite bijNN1_eq, bijNN2_eq ; simpl).
     reflexivity.
   Qed.
@@ -508,10 +407,9 @@ Section Definition_Inductive_Locale.
   (***************)
 
   Definition Bot : nat -> T := fun n => ⊥.
-  (* TODO instance *)
-  Notation "⊥" := Bot.
+  Instance BotNatT : Bottom (nat -> T) := Bot.
 
-  Lemma Bot_le : forall U, ⊥ ⩽ U.
+  Lemma Bot_le : forall U, ⊥ ≤ U.
   Proof.
     intro.
     unfold Covrel.
@@ -523,7 +421,7 @@ Section Definition_Inductive_Locale.
   Qed.
 
   Definition Top : nat -> T := fun n => ⊤.
-  Lemma Top_le : forall U, U ⩽ Top.
+  Lemma Top_le : forall U, U ≤ Top.
   Proof.
     intro.
     unfold Covrel.
@@ -534,31 +432,248 @@ Section Definition_Inductive_Locale.
     unfold Top. reflexivity.
   Qed.
 
-  Definition FFrame : @Frame (nat -> T) Covrel :=
-    MkFrame
+  Definition PO_for_FFrame : @Preorder (nat -> T) Covrel :=
+    MkPreorder
       (nat -> T)
       Covrel
       Covrel_refl
-      Covrel_trans
+      Covrel_trans.
+
+  Definition MSL_for_FFrame : @MeetSemiLattice (nat -> T) Covrel :=
+    MkMSL
+      (nat -> T)
+      Covrel
+      PO_for_FFrame
       Top
       Top_le
       Bot
       Bot_le
-      Meet
-      Meet_l
-      Meet_r
-      Meet_univ
-      Join
-      Join_l
-      Join_r
-      Join_univ
-      V
+      CMeet
+      CMeet_l
+      CMeet_r
+      Meet_univ.
+
+  Definition FFrame : @Frame (nat -> T) Covrel :=
+    MkFrame
+      (nat -> T)
+      Covrel
+      MSL_for_FFrame
+      Vc
       V_le
       V_univ
       Cdistr_l.
+
+  Definition FFeq := @Feq (nat -> T) Covrel.
+  Definition FFeq_setoid := Feq_equivalence PO_for_FFrame.
+
+  (**************************)
+  (* Facts on finite unions *)
+  (**************************)
+ 
+  Definition FinU (u : nat -> T) :=
+    { n : nat | forall k, n <= k -> u k = ⊥ }.
+
+  Definition finBot : FinU bottom.
+  Proof.
+    unfold FinU.
+    apply exist with (x:=O).
+    unfold bottom, BotNatT, Bot.
+    intros. reflexivity.
+  Qed.
+
+  (***************************)
+  (* Injection of generators *)
+  (***************************)
+
+  Definition inj_gen (t : T) : (nat -> T) := fun _ => t.
+
+  Instance inj_gen_mslmorph : MSLMorphism Tmsl MSL_for_FFrame inj_gen.
+  Proof.
+    apply MkMSLMorphism ; unfold inj_gen.
+    - apply MkPOMorphism.
+      intros.
+      unfold le, Covrel. intro.
+      apply cr_left with (b := y) ; try assumption.
+      apply cr_refl with (n := O) ; reflexivity.
+    - intros.
+      reflexivity.
+    - reflexivity.
+  Qed.
+    
+  Existing Instance FFrame.
+  Lemma V_inj_gen : forall u : nat -> T, V (fun n => inj_gen (u n)) = u.
+  Proof.
+    intro.
+    unfold inj_gen.
+    unfold V, FFrame, Vc.
+    split ; unfold le, Covrel_le, Covrel ; intro.
+    apply cr_n.
+    set (g := fun a => u (bijNN1 a)).
+    assert (u n = g (bijNN (n,O))).
+    unfold g.
+    rewrite bijNN1_eq. simpl. reflexivity.
+    rewrite H.
+    apply cr_n.
+  Qed.        
+
+  (****************)
+  (* Universality *)
+  (****************)
+
+  (* First, we need to asume a few things
+     about the axioms, showing that they
+     are compatible with the equality on
+     the meet semilattice.
+   *)
+
+  (* This function transports an axiom to an
+     equivalent axiom in the covering set of another element *)
+  Variable CovAx_rect : forall s t: T, s = t -> Idx s -> Idx t.
+  Variable CovAx_rect_bij : forall (s t: T), forall (H: s = t), forall i, CovAx s i = CovAx t (CovAx_rect s t H i).
+
+  (* Now let us assume that we have a meet semilattice
+     morphism to an arbitrary frame R *)
+  Variable R : Type.
+  Variable Rle : Le R.
+  Variable RFrame : @Frame R Rle.
+
+  Definition Rmsl := @frame_msl R Rle RFrame.
+  Definition Rpo := @msl_preorder R Rle Rmsl.
+  Variable f : T -> R.
+  Variable mslmorph : MSLMorphism Tmsl Rmsl f.
+  Existing Instance mslmorph.
+
+  (* We assume that the morphism respects the axioms
+     we have used to generate our free frame *)
+  Definition respects_axioms : Prop :=
+    forall t : T, forall i : Idx t, f t ≤ V (f ∘ (CovAx t i)).
+  Variable resp_ax : respects_axioms.
+
+  (* We define a function from our free frame to R *)
+  Definition fframe_ext (x : nat -> T) : R :=
+    V (f ∘ x).
+
+  (* We show that this function is a frame morphism *)
+  Existing Instance Covrel_le.
+  Check (@V (nat -> T) Covrel_le FFrame).
   
+  Lemma f_covrel : forall a U, a ◁ U -> f a ≤ V (f ∘ U).
+  Proof.
+    intros.
+    induction H.
+    - rewrite <- H.
+      assert (f (U n) = (f ∘ U) n) by reflexivity.
+      rewrite H0 ; apply v_le.
+    - unfold respects_axioms in resp_ax.
+      specialize (resp_ax b i).
+      set (K := (V (fun n => f (a ⊓ CovAx b i n)))).
+      apply le_trans with (y := K).
+      + assert (K = f a ⊓ V (f ∘ CovAx b i)).
+        * rewrite cdistr.
+          apply V_morphism ; intro.
+          unfold compose.
+          rewrite mslmorph_meet.
+          reflexivity.
+          apply mslmorph.
+        * rewrite H2.
+          apply le_trans with (y := f a ⊓ f b).
+          assert (f a ≤ f b) by (apply (pomorph_le a b H)).
+          assert (f a ⊓ f b = f a) by (apply order_meet ; assumption).
+          rewrite H4.
+          apply le_refl.
+          apply meet_le.
+          apply le_refl.
+          assumption.
+      + unfold K.
+        apply v_univ.
+        assumption.
+    - apply le_trans with (y := f b).
+      assert (f a ≤ f b) by (apply (pomorph_le a b H)).
+      assumption. assumption.
+  Qed.
+
+  Instance fframe_mor : FMorphism FFrame RFrame fframe_ext.
+  Proof.
+    unfold fframe_ext.
+    apply MkFMorphism.
+    
+    - apply MkMSLMorphism.
+      + apply MkPOMorphism.
+        intros.
+        apply v_univ ; intro.
+        unfold compose.
+        unfold le, Covrel in H.
+        specialize (H n).
+        apply f_covrel ; assumption.
+      + intros.
+        unfold meet, msl_meet, FFrame. simpl.
+        unfold CMeet, compose.
+        assert (forall n, f (x (bijNN1 n) ⊓ y (bijNN2 n)) = f (x (bijNN1 n)) ⊓ f (y (bijNN2 n))).
+        intro.
+        apply (@mslmorph_meet T R Tle Rle Tmsl Rmsl f mslmorph).
+        setoid_rewrite H.
+        symmetry.
+        apply V_meet.
+
+      + unfold compose.
+        unfold bottom, msl_bot, FFrame. simpl.
+        unfold Bot. simpl.
+        assert (pointwise_relation nat Feq (fun _ => f ⊥) (fun _ => ⊥)).
+        unfold pointwise_relation ; intro.
+        apply mslmorph_bot. assumption.
+        rewrite H.
+        apply V_bot.
+
+    - intro.
+      unfold compose.
+      rewrite <- V_pair.
+      apply V_morphism ; intro.
+      unfold V, FFrame, Vc, bijNN1, bijNN2.
+      reflexivity.
+  Qed.
+  
+  Definition fframe_mslmorph := fmorph_mslmorph FFrame RFrame fframe_ext.
+  Proposition fframe_factoring : fframe_ext ∘ inj_gen = f.
+  Proof.
+    unfold equiv, ext_equiv, respectful.
+    intros.
+    unfold inj_gen, fframe_ext, compose.
+    rewrite <- H.
+    apply V_const.
+  Qed.
+
+  (* Now the uniqueness part of the universality:
+     if we have another such frame morphism,
+     then it is equal to fframe_ext *)
+
+  Variable other_fact : (nat -> T) -> R.
+  Variable other_morph : FMorphism FFrame RFrame other_fact.
+  Existing Instance other_morph.
+  Instance other_mslmorph : MSLMorphism MSL_for_FFrame Rmsl other_fact := fmorph_mslmorph FFrame RFrame other_fact.
+  Instance other_morph_po : POMorphism other_fact.
+  Proof.
+    apply (mslmorph_pomorph MSL_for_FFrame Rmsl).
+  Qed.    
+    
+  Variable other_commutes : other_fact ∘ inj_gen = f.
+
+  Existing Instance Covrel_le.
+  Check @ext_equiv.
+  Instance coveq_R : Equiv (nat -> R) := @ext_equiv nat (≡) R (=).
+  
+  Proposition other_fact_equal : forall u, other_fact u = fframe_ext u.
+  Proof.
+    intro.
+    assert (other_fact u = other_fact (V (fun n => inj_gen (u n)))).
+    rewrite V_inj_gen ; reflexivity.
+    rewrite H.
+    rewrite morph_V.
+    unfold fframe_ext, compose.
+    apply V_morphism.
+    intro.
+    unfold equiv, ext_equiv, respectful in other_commutes.
+    apply other_commutes ; reflexivity.
+    assumption.
+  Qed.
+
 End Definition_Inductive_Locale.
-
-About FFrame.
-
-
