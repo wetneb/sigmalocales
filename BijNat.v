@@ -1,3 +1,8 @@
+
+(** This module defines two bijections: [bijNN : nat * nat -> nat] and
+      [bijNpN : nat + nat -> nat]. *)
+
+
 Section Bijection_Naturals.
 
 
@@ -12,9 +17,11 @@ Section Bijection_Naturals.
   Definition NN := (nat*nat)%type.
   Definition NpN := (nat + nat)%type.
 
-  (******************************************)
-  (* Definition of the bijection N x N -> N *)
-  (******************************************)
+  (** * Bijection [nat * nat -> nat]
+
+   Every positive integer [n] can be written uniquely
+   as $(2p + 1)2^q$.
+   *)
   
   Fixpoint bijNNp (a b : nat) : nat :=
     match a, b with
@@ -395,7 +402,8 @@ Section Bijection_Naturals.
   apply PeanoNat.Nat.le_max_l.
   Defined.
 
-    
+
+ (*
   Lemma boundedness_NpN : forall n m : nat, exists p, forall k, p <= k -> greaterNpN n m (bijNpNinv k) .
   Proof.
     intros.
@@ -411,6 +419,6 @@ Section Bijection_Naturals.
     destruct (le_le_S_dec n n0) ; try assumption.
     specialize (l (S n0) l1).
     
-
+ *)
 End Bijection_Naturals.
 

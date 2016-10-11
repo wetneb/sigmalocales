@@ -1,5 +1,13 @@
 Section PreorderEquiv.
   Require Import MyNotations.
+
+  (** * Preorders and induced equivalence relations
+      
+      This module defines preorders and the equivalence
+      relation they induce on their carrier. Following
+      math-classes, this equivalence relation is 
+      denoted by [=], and we reserve [≡] for coq's equality.
+    *) 
   
   Context {T : Type}.
   Context {Tle : Le T}.
@@ -16,6 +24,9 @@ Section PreorderEquiv.
   Definition Feq (x y : T) := x ≤ y /\ y ≤ x.
   Instance Feq_equiv : Equiv T := Feq.
   Hint Unfold Feq_equiv Feq.
+
+  (** A simple tactic that tries to solve
+      inequations with the preorder axioms. *)
 
   Ltac preorder :=
     unfold Feq_equiv, Feq in * ; repeat (
@@ -82,6 +93,8 @@ Add Parametric Morphism (T : Type) (Tle : Le T) (PO : Preorder Tle) : Tle with s
 Proof.
   intros. apply (le_proper_Feq PO) ; assumption.
 Qed.
+
+(** * Preorder morphisms *)
 
 Section PreorderMorphism.
   Context {T1 T2 : Type}.

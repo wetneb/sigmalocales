@@ -7,7 +7,7 @@ Require Import MathClasses.interfaces.canonical_names.
 
 Section MeetSemiLattice_definition.
   
-  Class MeetSemiLattice `{T : Type} `{Tle : Le T} :=
+  Class MeetSemiLattice `{T : Type} (Tle : Le T) :=
     MkMSL {
         (* preorder *)
         msl_preorder :> Preorder Tle;
@@ -132,29 +132,49 @@ Section MeetSemiLattice_definition.
     apply meet_top_l.
   Qed.
 
-  Lemma order_meet : forall x y, x ≤ y <-> x ⊓ y = x.
+  Lemma order_then_meet : forall x y, x ≤ y -> x ⊓ y = x.
   Proof.
-    intros.
-    unfold iff. split.
-
     intros. split.
     apply meet_l.
     apply (le_trans _ (x ⊓ x) _).
     setoid_rewrite meet_idem. apply le_refl.
-    apply meet_le_r.
-    apply H.
-    intro.
+    apply meet_le_r ; assumption.
+  Qed.
+
+  Lemma meet_then_order : forall x y, x ⊓ y = x -> x ≤ y.
+  Proof.
+    intros.
     setoid_rewrite <- H.
     apply meet_r.
   Qed.
+  
+  Lemma order_meet : forall x y, x ≤ y <-> x ⊓ y = x.
+  Proof.
+    intros ; split.
+    apply order_then_meet.
+    apply meet_then_order.
+  Qed.
+  
 
 End MeetSemiLattice_definition.
 
 
-Add Parametric Morphism (T : Type) (Tle : Le T) (Tmsl : MeetSemiLattice) : (@msl_meet T Tle Tmsl) with signature (Feq ==> Feq ==> Feq) as msl_meet_morphism.
+Add Parametric Morphism (T : Type) (Tle : Le T) (Tmsl : MeetSemiLattice Tle) : (@msl_meet T Tle Tmsl) with signature (Feq ==> Feq ==> Feq) as msl_meet_morphism.
 Proof.
   apply (@meet_morphism T Tle Tmsl).
 Qed.
+
+Ltac meetsemilattice := repeat(
+  match goal with
+    | [ |- context[ ?x ⊓ ?x ] ]  => rewrite meet_idem
+    | [ |- context[ ⊥ ⊓ ?x ] ] => rewrite meet_bot_l
+    | [ |- context[ ?x ⊓ ⊥ ] ] => rewrite meet_bot_r
+    | [ |- context[ ⊤ ⊓ ?x ] ] => rewrite meet_top_l
+    | [ |- context [ ?x ⊓ ⊤ ] ] => rewrite meet_top_r
+    | _ => idtac "auto" ; progress auto
+  end;
+  try reflexivity).
+(* Hint Rewrite meet_idem meet_bot_l meet_bot_r meet_top_l meet_top_r : rewrite_msl. *)
 
 Section MeetSemiLattice_morphism.
   Context {t1 t2 : Type}.
@@ -172,7 +192,9 @@ Section MeetSemiLattice_morphism.
         (* preserves meets *)
         mslmorph_meet : forall x y : t1, f (x ⊓ y) = (f x) ⊓ (f y);
         (* preserves bot *)
-        mslmorph_bot : f ⊥ = ⊥          
+        mslmorph_bot : f ⊥ = ⊥ ;
+        (* preserves top *)
+        mslmorph_top : f ⊤ = ⊤ ;    
       }.
 
 End MeetSemiLattice_morphism.
@@ -204,9 +226,13 @@ Section MeetSemiLattice_composition.
       reflexivity.
       exact gm.
       exact fm.
-    - intros.
+    - rewrite mslmorph_bot.
       rewrite mslmorph_bot.
-      rewrite mslmorph_bot.
+      reflexivity.
+      exact gm.
+      exact fm.
+    - rewrite mslmorph_top.
+      rewrite mslmorph_top.
       reflexivity.
       exact gm.
       exact fm.
@@ -214,4 +240,42 @@ Section MeetSemiLattice_composition.
   
 End MeetSemiLattice_composition.
 
+Section TrivialMSL.
 
+  Inductive SigmaGen :=
+| sBot : SigmaGen
+| sTop : SigmaGen.
+
+  Inductive SigmaGenRel : forall a b : SigmaGen, Prop :=
+  | sLeRefl : forall x, SigmaGenRel x x
+  | sLeBotTop : SigmaGenRel sBot sTop.
+
+  Hint Resolve sLeRefl sLeBotTop.
+  
+  Instance SigmaGenLe : Le SigmaGen := SigmaGenRel.
+
+  Definition SigmaGenMeet a b :=
+    match a, b with
+      | sTop, sTop => sTop
+      | _, _ => sBot
+    end.
+
+  Ltac solveSigmaGen :=
+    unfold le, SigmaGenLe, top, bottom, meet, SigmaGenMeet ; auto.
+
+  Instance SigmaGenMSL : MeetSemiLattice SigmaGenRel.
+  Proof.
+    apply MkMSL with (msl_top := sTop)
+                       (msl_bot := sBot)
+                       (msl_meet := SigmaGenMeet).
+    - apply MkPreorder.
+      * apply sLeRefl.
+      * intros.
+        destruct x, y, z ; inversion H ; inversion H0 ; auto.
+    - destruct x ; solveSigmaGen.
+    - destruct x ; solveSigmaGen.
+    - destruct x, y ; solveSigmaGen.
+    - destruct x, y ; solveSigmaGen.
+    - destruct x, y, z ; solveSigmaGen.
+  Defined.
+End TrivialMSL.

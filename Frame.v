@@ -3,13 +3,14 @@ Require Import MathClasses.interfaces.canonical_names.
 Require Import Coq.Lists.List.
 Require Import BijNat.
 Require Import MeetSemiLattice.
+Require Import DistrLattice.
 Require Import PreorderEquiv.
 
 Section Frame_Definition.
 
 Class Frame {t:Type} {le: Le t} :=
   MkFrame {
-      frame_msl :> @MeetSemiLattice t le;
+      frame_msl :> MeetSemiLattice le;
 
       (* countable joins *)
       V : (nat -> t) -> t;
@@ -202,64 +203,21 @@ Class Frame {t:Type} {le: Le t} :=
   (****************)
   (* Finite joins *)
   (****************)
-
   
-  Definition V_cons (x : t) (u : nat -> t) (n : nat) :=
-    match n with
-      | 0 => x
-      | S n => u n
-    end.
-  Infix ":::" := V_cons (right associativity, at level 60).
+  Require Import SeqOfList.
+  Check @seq_of_list.
+  Instance t_po : Preorder le.
+  Proof. apply msl_preorder. Defined.
+  Existing Instance setoid_msl.
   
-  Definition V_tail (u : nat -> t) (n : nat) := u (S n).
-
-  Fixpoint seq_of_list (l : list t) : (nat -> t) :=
-    match l with
-      | [] => fun _ => ⊥
-      | h :: q => h ::: (seq_of_list q)
-    end.
-
-  Inductive listeq : forall u v : list t, Prop :=
-  | listeq_nil : listeq nil nil
-  | listeq_cons : forall a b u v, a = b -> listeq u v -> listeq (a :: u) (b :: v).
-  Instance listeq_equiv : Equiv (list t) := listeq.
-  Definition listeq_equivalence : Equivalence listeq.
-  Proof.
-    apply Build_Equivalence ; unfold Reflexive, Transitive, Symmetric.
-    induction x.
-    apply listeq_nil.
-    apply listeq_cons ; auto.
-    induction x ; intros.
-    inversion H. apply listeq_nil.
-    inversion H. subst. apply listeq_cons.
-    symmetry. apply H2. apply IHx. assumption.
-    induction x ; intros.
-    inversion H ; subst ; assumption.
-    inversion H ; subst.
-    inversion H0 ; subst.
-    apply listeq_cons ; auto.
-    apply IHx with (y := v) ; assumption.
-  Qed.
-  Add Setoid (list t) listeq listeq_equivalence as listeq_setoid.
-
   Definition Vf (l : list t) : t := V (seq_of_list l).
-
-  Add Morphism seq_of_list with signature
-      (listeq ==> pointwise_relation nat Feq) as seq_of_list_morphism.
-  Proof.
-    unfold pointwise_relation.
-    induction x ; intros ; inversion H ; subst.
-    reflexivity.
-    destruct a0 ; simpl.
-    + assumption.
-    + apply IHx. assumption.
-  Qed.
 
   Add Morphism Vf : Vf_morphism.
   Proof.
     intros. unfold Vf.
     apply V_morphism.
     apply seq_of_list_morphism.
+    apply setoid_msl. apply t_po.
     assumption.
   Qed.
 
@@ -280,7 +238,7 @@ Class Frame {t:Type} {le: Le t} :=
   Ltac unfold_joinb :=
     unfold join, joinb_join, joinb, Vf.
   
-  Lemma join_l : forall u v : t, u ≤ u ⊔ v.
+  Lemma joinb_l : forall u v : t, u ≤ u ⊔ v.
   Proof.
     intros.
     unfold_joinb. simpl.
@@ -289,7 +247,7 @@ Class Frame {t:Type} {le: Le t} :=
     rewrite H. apply v_le.
   Qed.
 
-  Lemma join_r : forall u v : t, v ≤ u ⊔ v.
+  Lemma joinb_r : forall u v : t, v ≤ u ⊔ v.
   Proof.
     intros ; unfold_joinb ; simpl.
     set (f := (u ::: v ::: (fun _ : nat => ⊥))).
@@ -297,7 +255,7 @@ Class Frame {t:Type} {le: Le t} :=
     rewrite H. apply v_le.
   Qed.
 
-  Lemma join_univ : forall u v w : t, u ≤ w -> v ≤ w -> u ⊔ v ≤ w.
+  Lemma joinb_univ : forall u v w : t, u ≤ w -> v ≤ w -> u ⊔ v ≤ w.
   Proof.
     intros ; unfold_joinb ; simpl.
     apply v_univ ; intro.
@@ -306,119 +264,32 @@ Class Frame {t:Type} {le: Le t} :=
     apply bot_le.
   Qed.
 
-  Lemma join_le_l : forall x y z, x ≤ y -> x ⊔ z ≤ y ⊔ z.
+  Lemma joinb_distr : forall u v w, u ⊓ (v ⊔ w) ≤ (u ⊓ v) ⊔ (u ⊓ w).
   Proof.
     intros.
-    apply join_univ.
-    apply (le_trans _ y _ H).
-    apply join_l.
-    apply join_r.
+    unfold_joinb.
+    apply le_trans with (y := V (fun n => u ⊓ (seq_of_list [v;w] n))).
+    apply cdistr_l.
+    unfold seq_of_list.
+    apply v_univ. intro.
+    destruct n ; simpl.
+    smart_V_le O.
+    destruct n ; simpl.
+    smart_V_le (S O).
+    rewrite meet_bot_r.
+    apply bot_le.
   Qed.
 
-  Lemma join_le_r : forall x y z, x ≤ y -> z ⊔ x ≤ z ⊔ y.
-  Proof.    
-    intros.
-    apply join_univ.
-    apply join_l.
-    apply (le_trans _ y _ H).
-    apply join_r.
-  Qed.
-
-  Lemma join_le : forall x y z w, x ≤ y -> z ≤ w -> x ⊔ z ≤ y ⊔ w.
-  Proof.
-    intros.
-    apply (le_trans _ (x ⊔ w) _).
-    apply (join_le_r _ _ _ H0).
-    apply (join_le_l _ _ _ H).
-  Qed.
-
-  Add Morphism join with signature (Feq ==> Feq ==> Feq) as join_morphism.
-  Proof.
-    firstorder.
-    apply (join_le _ _ _ _ H H0).
-    apply (join_le _ _ _ _ H2 H1).
-  Qed.
-
-  Lemma join_comm : forall x y:t, x ⊔ y = y ⊔ x.
-  Proof.
-    unfold Feq.
-    intros. split.
-    apply join_univ. apply join_r. apply join_l.
-    apply join_univ. apply join_r. apply join_l.
-  Qed.
-
-  Lemma join_assoc : forall x y z, x ⊔ (y ⊔ z) = (x ⊔ y) ⊔ z.
-  Proof.  
-    intros.
-    unfold Feq. split.
-
-    apply join_univ.
-    apply (le_trans _ (x ⊔ y) _).
-    apply join_l.
-    apply join_l.
-    apply join_le_l.
-    apply join_r.
-
-    apply join_univ.
-    apply join_le_r.
-    apply join_l.
-    apply (le_trans _ (y ⊔ z) _).
-    apply join_r.
-    apply join_r.
-  Qed.
-
-  Lemma join_idem : forall x, x ⊔ x = x.
-  Proof.
-    intros.
-    unfold Feq. split.
-    apply (join_univ x x x (le_refl x) (le_refl x)).
-    apply join_l.
-  Qed.
-
-  Lemma join_bot_l : forall x, ⊥ ⊔ x = x.
-  Proof.
-    intros. split.
-    apply join_univ. apply bot_le.
-    apply le_refl.
-    apply join_r.
-  Qed.
-
-  Lemma join_bot_r : forall x, x ⊔ ⊥ = x.
-  Proof.
-    intro. setoid_rewrite join_comm.
-    apply join_bot_l.
-  Qed.
-
-  Lemma join_top_l : forall x, ⊤ ⊔ x = ⊤.
-  Proof.
-    intro. split.
-    apply join_univ. apply le_refl.
-    apply top_le.
-    apply join_l.
-  Qed.
-
-  Lemma join_top_r : forall x, x ⊔ ⊤ = ⊤.
-  Proof.
-    intro. setoid_rewrite join_comm.
-    apply join_top_l.
-  Qed. 
-
-  (* Equivalent definitions of the order *)
-  Lemma order_join : forall x y, x ≤ y <-> x ⊔ y = y.
-  Proof.
-    intros.
-    unfold iff. split.
-
-    intros. split.
-    apply (le_trans _ (y ⊔ y) _).
-    apply (join_le_l _ _ _ H).
-    setoid_rewrite (join_idem y).
-    apply le_refl.
-    apply join_r.
-
-    intros. setoid_rewrite <- H.
-    apply join_l.
-  Qed.
+  Instance dl_frame : DistrLattice le :=
+    MkDistrLattice
+      t
+      le
+      frame_msl
+      joinb
+      joinb_l
+      joinb_r
+      joinb_univ
+      joinb_distr.
 
   (****************)
   (* Finite joins *)
@@ -511,7 +382,7 @@ Class Frame {t:Type} {le: Le t} :=
     (* S n *)
     intros.
     simpl.
-    apply join_univ.
+    apply joinb_univ.
     apply v_le.
     apply (le_trans _ (V (V_tail w)) _).
     apply IHn.
@@ -535,23 +406,12 @@ Class Frame {t:Type} {le: Le t} :=
 
 End Frame_Definition.
 
-Add Parametric Morphism (T : Type) (Tle : Le T) (Tf : @Frame T Tle) : (@joinb T Tle Tf) with signature (Feq ==> Feq ==> Feq) as f_join_morphism.
-Proof.
-  apply join_morphism.
-Qed.
 
 Add Parametric Morphism (T : Type) (Tle : Le T) (Tf : Frame) : V with signature (pointwise_relation nat Feq ==> Feq) as f_V_morphism.
 Proof.
   apply V_morphism.
 Qed.
 
-  (*
-Add Parametric Relation (T : Type) (Tle : Le T) (Tmsl : MeetSemiLattice): T Feq
-    reflexivity proved by (Feq_refl Tle Tmsl)
-    symmetry proved by (Feq_sym Tle Tmsl)
-    transitivity proved by (Feq_trans Tle Tmsl)
-      as setoid_msl.
-*)
 
 
 Section Frame_Morphism_Definition.
@@ -582,4 +442,32 @@ Section Frame_Morphism_Definition.
         morph_V: forall u : nat -> tA, f (V u) = V (f ∘ u)
       }.
 
+  Existing Instance listeq_equiv.
+
+  Variable fmorph : FMorphism.
+  Existing Instance fmorph.
+
+  Proposition FMorphism_join : forall a b, f (a ⊔ b) = f a ⊔ f b.
+  Proof.
+    intros.
+    unfold join, joinb_join, joinb.
+    assert ([f a; f b] = map f [a; b]) by reflexivity.
+    unfold Vf.
+    rewrite H.
+    rewrite seq_of_list_compose.
+    apply morph_V.
+    apply Feq_equivalence.
+    apply msl_preorder.
+    apply mslmorph_bot.
+    apply fmorph_mslmorph.
+  Qed.
+
 End Frame_Morphism_Definition.
+
+
+
+(* exported_tactics *)
+Ltac smart_V_le n :=
+  apply (V_le_le n);
+  simpl;
+  try (apply le_refl).
