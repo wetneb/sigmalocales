@@ -3,6 +3,9 @@
 *.glob
 *.aux
 *~
+*.v.d
 # emacs
 .\#*
 \#*\#
+# coqdoc
+*.html
