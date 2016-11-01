@@ -1,6 +1,9 @@
 # coq files
 *.vo
 *.glob
+*.aux
+*.v.d
 *~
 # emacs
-\#~\#
+.\#*
+\#*\#

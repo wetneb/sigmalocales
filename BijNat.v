@@ -1,3 +1,8 @@
+
+(** This module defines two bijections: [bijNN : nat * nat -> nat] and
+      [bijNpN : nat + nat -> nat]. *)
+
+
 Section Bijection_Naturals.
 
 
@@ -12,9 +17,12 @@ Section Bijection_Naturals.
   Definition NN := (nat*nat)%type.
   Definition NpN := (nat + nat)%type.
 
-  (******************************************)
-  (* Definition of the bijection N x N -> N *)
-  (******************************************)
+  (** * Bijection [nat * nat -> nat]
+
+   Every positive integer [n] can be written uniquely
+   as [(2p + 1). 2^q], so we define our bijection as
+   follows.
+   *)
   
   Fixpoint bijNNp (a b : nat) : nat :=
     match a, b with
@@ -24,7 +32,9 @@ Section Bijection_Naturals.
 
   Definition bijNN (p : NN) : nat := pred (bijNNp (fst p) (snd p)).
 
-  (* bijNNp is positive *)
+  (** ** Forward map *)
+  
+  (** bijNNp is positive. *)
   Lemma bijNNp_pos : forall a b, 0 < bijNNp a b.
   Proof.
     intros.
@@ -34,22 +44,24 @@ Section Bijection_Naturals.
     apply (lt_plus_trans 0 (bijNNp a b) _ IHa).
   Qed.
 
-  (* caracterization of the image of bijNNp *)
+  (** We characterize the graph of [bijNNp].
+    *)
   Lemma bijNNp_carac : forall a b, (bijNNp a b = S (b + b) /\ a = 0) \/ (even (bijNNp a b) /\ bijNNp a b = 2 * bijNNp (pred a) b).
   Proof.
     intros.
     destruct a.
 
-    (* a = 0 *)
-    apply or_introl. split. reflexivity. reflexivity.
+    - (* a = 0 *)
+      apply or_introl. split.
+      reflexivity. reflexivity.
 
-    (* S a *)
-    apply or_intror.
-    simpl. split. rewrite <- plus_n_O. apply double_is_even.
-    reflexivity.
+    - (* S a *)
+      apply or_intror.
+      simpl. split. rewrite <- plus_n_O. apply double_is_even.
+      reflexivity.
   Qed.
 
-  (* Lemmas for the termination of the reverse map *)
+  (** ** Lemmas for the termination of the reverse map *)
 
   Lemma n_le_S_m : forall n m, n < S m -> (n = m) \/ (n < m).
   Proof.
@@ -63,15 +75,15 @@ Section Bijection_Naturals.
   Lemma div2_n_le_n_bi : forall n, div2 (S n) < (S n) /\ div2 (S (S n)) < (S (S n)).
   Proof.
     induction n.
-    (* n = 0 *)
-    auto.
-    (* S n *)
-    destruct IHn.
-    split. assumption.
-    simpl. apply lt_n_S.
-    destruct n. auto.
-    simpl in H. apply (lt_trans _ (S (S n)) _ H).
-    auto.
+    - (* n = 0 *)
+      auto.
+    - (* S n *)
+      destruct IHn.
+      split. assumption.
+      simpl. apply lt_n_S.
+      destruct n. auto.
+      simpl in H. apply (lt_trans _ (S (S n)) _ H).
+      auto.
   Defined.
 
   Lemma div2_n_le : forall n, div2 (S (S n)) < (S (S n)).
@@ -80,7 +92,7 @@ Section Bijection_Naturals.
     apply div2_n_le_n_bi.
   Defined.
 
-  (* Definition of the reverse map *)
+  (** ** Definition of the reverse map *)
   
   Program Fixpoint bijNN_rev (n : nat) { measure n } : { q : NN | (n = 0) \/ (n = S (bijNN q))} :=
     match n with
@@ -95,53 +107,55 @@ Section Bijection_Naturals.
   Obligation 3.
   apply div2_n_le.
   Qed.
+  
   Obligation 4.
   apply or_intror.
   destruct pr as [pr1|pr2].
-  inversion pr1.
-  apply eq_S.
-  inversion pr2.
-  specialize (bijNN_rev (S p)).
-  destruct bijNN_rev.
-  auto.
-  destruct o.
-  inversion H.
-  unfold bijNN. simpl.
-  unfold bijNN in H0.
-  rewrite <- plus_n_O.
-  assert (pred (S p) = pred (pred (bijNNp (fst a) (snd a) + (bijNNp (fst a) (snd a))))).
-  simpl.
-  rewrite pred_sum.
-  rewrite <- H0.
-  inversion e. inversion H2.
-  rewrite <- double_plus.
-  apply (even_double p H4).
-  apply bijNNp_pos.
-  apply bijNNp_pos.
-  simpl in H1.
-  rewrite H1.
-  rewrite <- (S_pred _ 0).
-  reflexivity.
-  apply lt_pred.
-  apply (plus_le_lt_compat 1 _ 0).
-  apply lt_le_S.
-  apply bijNNp_pos.
-  apply bijNNp_pos.
+  - inversion pr1.
+  - apply eq_S.
+    inversion pr2.
+    specialize (bijNN_rev (S p)).
+    destruct bijNN_rev.
+    auto.
+    destruct o.
+    + inversion H.
+    + unfold bijNN. simpl.
+      unfold bijNN in H0.
+      rewrite <- plus_n_O.
+      assert (pred (S p) = pred (pred (bijNNp (fst a) (snd a) + (bijNNp (fst a) (snd a))))).
+      simpl.
+      rewrite pred_sum.
+      * rewrite <- H0.
+        inversion e. inversion H2.
+        rewrite <- double_plus.
+        apply (even_double p H4).
+      * apply bijNNp_pos.
+      * apply bijNNp_pos.
+      * simpl in H1.
+        rewrite H1.
+        rewrite <- (S_pred _ 0).
+        reflexivity.
+        apply lt_pred.
+        apply (plus_le_lt_compat 1 _ 0).
+        apply lt_le_S.
+        apply bijNNp_pos.
+        apply bijNNp_pos.
   Qed.
+  
   Obligation 5.
   apply or_intror.
   apply eq_S.
   specialize (bijNN_rev (S p)).
   destruct bijNN_rev.
-  auto.
-  destruct o0. inversion H.
-  inversion o.
-  inversion H1.
-  unfold bijNN. simpl.
-  apply eq_S.
-  rewrite <- plus_n_Sm.
-  rewrite <- double_plus.
-  apply (odd_double _ H3).
+  - auto.
+  - destruct o0. inversion H.
+    inversion o.
+    inversion H1.
+    unfold bijNN. simpl.
+    apply eq_S.
+    rewrite <- plus_n_Sm.
+    rewrite <- double_plus.
+    apply (odd_double _ H3).
   Qed.
 
   Definition bijNNinv (n : nat) : NN :=
@@ -149,95 +163,97 @@ Section Bijection_Naturals.
       | exist _ a P => a
     end.
 
+  (** ** The two map are mutual inverses *)
+
   Lemma bijNNp_inj : forall x y z w, bijNNp x y = bijNNp z w -> (x,y) = (z,w).
   Proof.
     intro x.
     induction x.
 
-    (* x = 0 *)
-    induction y.
+    - (* x = 0 *)
+      induction y.
     
-    (* x, y = 0 *)
-    intros. simpl in H.
-    (* case analysis on z *)
-    destruct z.
-    (* z = 0 *)
-    (* case analysis on w *)
-    destruct w.
-    reflexivity.
-    (* w > 0 *)
-    simpl in H. inversion H.
-    (* z > 0 *)
-    simpl in H.
-    assert (bijNNp z w > 0).
-    apply bijNNp_pos.
-    destruct (bijNNp z w).
-    inversion H.
-    rewrite plus_Sn_m in H.
-    rewrite plus_Sn_m in H.
-    rewrite <- plus_n_Sm in H.
-    inversion H.
+      + (* x, y = 0 *)
+        intros. simpl in H.
+        (* case analysis on z *)
+        destruct z.
+        * (* z = 0 *)
+          (* case analysis on w *)
+          destruct w.
+          reflexivity.
+          (* w > 0 *)
+          simpl in H. inversion H.
+        * (* z > 0 *)
+          simpl in H.
+          assert (bijNNp z w > 0).
+          apply bijNNp_pos.
+          destruct (bijNNp z w).
+          inversion H.
+          rewrite plus_Sn_m in H.
+          rewrite plus_Sn_m in H.
+          rewrite <- plus_n_Sm in H.
+          inversion H.
 
-    (* x = 0, y > 0 *)
-    intros.
-    simpl in H.
-    assert ((bijNNp z w = S (w + w) /\ z = 0) \/ (even (bijNNp z w) /\ bijNNp z w = 2 * bijNNp (pred z) w)).
-    apply bijNNp_carac.
-    (* case analysis on the carac *)
-    destruct H0. destruct H0.
-    rewrite H1.
-    rewrite H0 in H.
-    inversion H.
-    rewrite <- plus_Sn_m in H3.
-    apply double_injective in H3.
-    rewrite <- H3.
-    reflexivity.
-    (* absurd case of the carac *)
-    destruct H0.
-    rewrite <- H in H0.
-    inversion H0.
-    rewrite <- plus_Sn_m in H3.
-    apply (not_even_and_odd _ (double_is_even (S y))) in H3.
-    inversion H3.
+      + (* x = 0, y > 0 *)
+        intros.
+        simpl in H.
+        assert ((bijNNp z w = S (w + w) /\ z = 0) \/ (even (bijNNp z w) /\ bijNNp z w = 2 * bijNNp (pred z) w)).
+        apply bijNNp_carac.
+        (* case analysis on the carac *)
+        destruct H0. destruct H0.
+        * rewrite H1.
+          rewrite H0 in H.
+          inversion H.
+          rewrite <- plus_Sn_m in H3.
+          apply double_injective in H3.
+          rewrite <- H3.
+          reflexivity.
+        * (* absurd case of the carac *)
+          destruct H0.
+          rewrite <- H in H0.
+          inversion H0.
+          rewrite <- plus_Sn_m in H3.
+          apply (not_even_and_odd _ (double_is_even (S y))) in H3.
+          inversion H3.
 
-    (* x > 0 *)
-    intros.
-    simpl in H.
-    rewrite <- plus_n_O in H.
-    (* let's show that bijNNp z w is even and give that to carac *)
-    assert ((bijNNp z w = S (w + w) /\ z = 0) \/ (even (bijNNp z w) /\ bijNNp z w = 2 * bijNNp (pred z) w)).
-    apply bijNNp_carac.
-    destruct H0.
-    (* absurd case of the carac *)
-    destruct H0.
-    assert (odd (bijNNp z w)).
-    rewrite H0.
-    apply odd_S.
-    apply double_is_even.
-    assert (even (bijNNp z w)).
-    rewrite <- H.
-    apply double_is_even.
-    apply (not_even_and_odd _ H3) in H2.
-    inversion H2.
-    (* good case *)
-    destruct H0.
-    simpl in H1.
-    rewrite <- plus_n_O in H1.
-    rewrite <- H in H1.
-    apply double_injective in H1.
-    apply IHx in H1.
-    inversion H1.
-    (* final case analysis *)
-    destruct z.
-    (* absurd case *)
-    simpl in H0.
-    assert (even (w + w)).
-    apply double_is_even.
-    inversion H0.
-    apply (not_even_and_odd _ H2) in H6.
-    inversion H6.
-    (* good case *)
-    reflexivity.
+    - (* x > 0 *)
+      intros.
+      simpl in H.
+      rewrite <- plus_n_O in H.
+      (* let's show that bijNNp z w is even and give that to carac *)
+      assert ((bijNNp z w = S (w + w) /\ z = 0) \/ (even (bijNNp z w) /\ bijNNp z w = 2 * bijNNp (pred z) w)).
+      apply bijNNp_carac.
+      destruct H0.
+      + (* absurd case of the carac *)
+        destruct H0.
+        assert (odd (bijNNp z w)).
+        rewrite H0.
+        apply odd_S.
+        apply double_is_even.
+        assert (even (bijNNp z w)).
+        rewrite <- H.
+        apply double_is_even.
+        apply (not_even_and_odd _ H3) in H2.
+        inversion H2.
+      + (* good case *)
+        destruct H0.
+        simpl in H1.
+        rewrite <- plus_n_O in H1.
+        rewrite <- H in H1.
+        apply double_injective in H1.
+        apply IHx in H1.
+        inversion H1.
+        (* final case analysis *)
+        destruct z.
+        * (* absurd case *)
+          simpl in H0.
+          assert (even (w + w)).
+          apply double_is_even.
+          inversion H0.
+          apply (not_even_and_odd _ H2) in H6.
+          inversion H6.
+        * (* good case *)
+          reflexivity.
   Qed.
 
   Lemma bijNN_inj : forall p q, bijNN p = bijNN q -> p = q.
@@ -310,12 +326,12 @@ Section Bijection_Naturals.
     intro. unfold bijNN2. rewrite bijNNinv_bijNN.
     reflexivity.
   Qed.
-  
-  (******************************************)
-  (* Definition of the bijection N + N -> N *)
-  (******************************************)
 
-  Check (nat + nat)%type.
+  (** * Bijection [nat + nat -> nat] *)
+
+  (** ** Definition of the functions
+      This time the definition of both maps is much simpler. *)
+
   Definition bijNpN (p : NpN) : nat :=
     match p with
       | inl a => double a
@@ -328,19 +344,21 @@ Section Bijection_Naturals.
       | right o => inr (div2 x)
     end.
 
+  (** ** They are mutual inverses *)
+
   Theorem bijNpN_bij1 : forall n, bijNpN (bijNpNinv n) = n.
   Proof.
     intro.
     unfold bijNpNinv.
     destruct (even_odd_dec n).
 
-    (* n is even *)
-    simpl. symmetry.
-    apply (even_double _ e).
+    - (* n is even *)
+      simpl. symmetry.
+      apply (even_double _ e).
 
-    (* n is odd *)
-    simpl. symmetry.
-    apply (odd_double _ o).
+    - (* n is odd *)
+      simpl. symmetry.
+      apply (odd_double _ o).
   Qed.
 
   Theorem bijNpN_bij2 : forall p, bijNpNinv (bijNpN p) = p.
@@ -349,68 +367,26 @@ Section Bijection_Naturals.
     unfold bijNpN, bijNpNinv.
     destruct p.
 
-    (* double n *)
-    destruct (even_odd_dec (double n)).
-    (* good case *)
-    rewrite double_2times.
-    rewrite div2_double. reflexivity.
-    (* absurd case *)
-    apply (not_even_and_odd _ (double_is_even n)) in o.
-    inversion o.
+    - (* double n *)
+      destruct (even_odd_dec (double n)).
+      + (* good case *)
+        rewrite double_2times.
+        rewrite div2_double. reflexivity.
+      + (* absurd case *)
+        apply (not_even_and_odd _ (double_is_even n)) in o.
+        inversion o.
 
-    (* S (double n) *)
-    destruct (even_odd_dec (S (double n))).
-    (* absurd case *)
-    assert (odd (S (double n))).
-    apply odd_S. apply double_is_even.
-    contradiction (not_even_and_odd _ e H).
-    (* good case *)
-    rewrite double_2times.
-    rewrite div2_double_plus_one.
-    reflexivity.
+    - (* S (double n) *)
+      destruct (even_odd_dec (S (double n))).
+      + (* absurd case *)
+        assert (odd (S (double n))).
+        apply odd_S. apply double_is_even.
+        contradiction (not_even_and_odd _ e H).
+      + (* good case *)
+        rewrite double_2times.
+        rewrite div2_double_plus_one.
+        reflexivity.
   Qed.
-
-  (* Boundedness *)
-
-  Definition greaterNpN (n m : nat) (p : NpN) : Prop :=
-    match p with
-      | inl x => n <= x
-      | inr y => m <= y
-    end.
-
-  Program Fixpoint maxFun (f : nat -> nat) (n : nat) : {m : nat | forall p, p <= n -> f p <= m } :=
-    match n with
-      | O => f O
-      | S n => max (f (S n)) (maxFun f n)
-    end.
-  Obligation 1.
-  inversion H. reflexivity.
-  Defined.
-  Obligation 2.
-  destruct (proj1 (PeanoNat.Nat.le_succ_r _ _) H).
-  apply le_trans with (m := x).
-  apply (l _ H0).
-  apply PeanoNat.Nat.le_max_r.
-  rewrite H0.
-  apply PeanoNat.Nat.le_max_l.
-  Defined.
-
-    
-  Lemma boundedness_NpN : forall n m : nat, exists p, forall k, p <= k -> greaterNpN n m (bijNpNinv k) .
-  Proof.
-    intros.
-    set (a := (maxFun (fun u => bijNpN (inl u))) n).
-    set (b := (maxFun (fun v => bijNpN (inr v))) m).
-    destruct a, b.
-    exists (S (max x x0)).
-    intros.
-    unfold greaterNpN.
-    destruct (bijNpNinv k) eqn:G.
-  
-    SearchAbout ({ _ <= _ } + { _ <= _ }).
-    destruct (le_le_S_dec n n0) ; try assumption.
-    specialize (l (S n0) l1).
-    
 
 End Bijection_Naturals.
 

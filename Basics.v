@@ -43,7 +43,7 @@ Module PosRat <: Poset.
   Proof. unfold Symmetric, eq. intros x y. apply Qeq_sym. Qed.
   Lemma eq_trans : Transitive eq.
   Proof. unfold Transitive, eq. intros x y z. apply Qeq_trans. Qed.
-  Definition eq_equiv := (Build_Equivalence t eq eq_refl eq_sym eq_trans).
+  Definition eq_equiv := (Build_Equivalence eq eq_refl eq_sym eq_trans).
   Lemma le_morphism : Proper (eq ==> eq ==> iff) le.
   Proof.
     unfold Proper, respectful, le, eq.
