@@ -2,8 +2,8 @@
 *.vo
 *.glob
 *.aux
-*.v.d
 *~
+*.v.d
 # emacs
 .\#*
 \#*\#
