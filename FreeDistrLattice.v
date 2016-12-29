@@ -27,11 +27,12 @@ Require Import DistrLattice.
 Require Import Coq.Classes.RelationClasses.
 Require Import Coq.Lists.List.
 Require Import Coq.Lists.SetoidList.
+Require Import EquivlistMap.
 
 Section Definition_Inductive_Locale.
 
   (** * Definition of the free distributive lattice *)
-  
+
   (** Generators. *)
   Variable T : Type.
   Variable Tle : Le T.
@@ -71,40 +72,9 @@ Section Definition_Inductive_Locale.
     right. assumption.
   Qed.
 
-  Lemma map_in : forall f x U, (Proper ((=) ==> (=)) f) -> x ∈ U -> f x ∈ map f U.
-  Proof.
-    intros. unfold map.
-    induction H0.
-    apply InA_cons_hd.
-    apply H. assumption.
-    apply InA_cons_tl.
-    assumption.
-  Qed.
-
-  Lemma in_map : forall f x U, x ∈ map f U -> exists y, y ∈ U /\ x = f y.
-  Proof.
-    intros.
-    induction U.
-    - inversion H.
-    - set (V := map f (a :: U)) in *. assert( V ≡ map f (a :: U)) by reflexivity.
-      destruct H.
-      + inversion H0.
-        exists a. split.
-        apply InA_cons_hd. reflexivity.
-        rewrite <- H2. assumption.
-      + simpl in H0.
-        inversion H0. subst.
-        apply IHU in H.
-        destruct H as [y [G K]].
-        exists y. split.
-        apply InA_cons_tl.
-        assumption. assumption.
-  Qed.
-
   Instance FeqT_equivalence : Equivalence (Feq : T -> T -> Prop).
   Proof.
-    apply Feq_equivalence.
-    apply (@msl_preorder T le Tmsl).
+    apply (Feq_equivalence msl_preorder).
   Qed.
 
   Instance InA_Feq_compat : Proper (Feq ==> equivlistA Feq ==> iff) (InA (Feq : Equiv T)) := (InA_compat FeqT_equivalence).
@@ -354,7 +324,7 @@ Section Definition_Inductive_Locale.
     - (* cr_refl *)
       apply cr_refl.
       unfold down ; simpl.
-      apply map_in.
+      apply map_in with (Qeq := (=)).
       unfold Proper, respectful. intros. rewrite H0. reflexivity.
       assumption.
 
@@ -386,7 +356,7 @@ Section Definition_Inductive_Locale.
       rewrite IHu. rewrite IHu.
       rewrite app_assoc.
       reflexivity.
- Qed.
+  Qed.
       
   Lemma list_prod_univ f : forall U V x, x ∈ (list_prod f U V) -> exists a b, a ∈ U /\ b ∈ V /\ x = f a b.
   Proof.
@@ -396,11 +366,12 @@ Section Definition_Inductive_Locale.
     rewrite fold_left_concat in H.
     apply InA_app in H.
     destruct H.
-    - apply in_map in H.
+    - apply in_map with (Qeq := Feq) in H.
       destruct H as [y [H G]].
       exists a. exists y. split.
       + apply InA_cons_hd. reflexivity.
       + split ; assumption.
+      + exact FeqT_equivalence.
     - apply IHU in H.
       destruct H as (c & d & G & K & L).
       exists c. exists d. split.
@@ -427,7 +398,7 @@ Section Definition_Inductive_Locale.
       specialize (Q (f a b) (f y b) H0 (map (f y) V) (map (f y) V) K).
       destruct Q.
       apply H2.
-      apply map_in.
+      apply map_in with (Qeq := (=)).
       apply P. reflexivity. assumption.
     - right.
       apply IHInA. assumption.
@@ -503,7 +474,7 @@ Section Definition_Inductive_Locale.
     - rewrite H. meetsemilattice.
       simpl.
       apply cr_bot. reflexivity.
-    - apply cr_refl. apply map_in.
+    - apply cr_refl. apply map_in with (Qeq := (=)).
       apply meet_morphism_Proper. reflexivity.
       assumption.
     - apply cr_inf with (b := b) (i := i).
@@ -667,12 +638,13 @@ Section Definition_Inductive_Locale.
     - reflexivity.
   Qed.
     
-  Lemma V_inj_gen : forall u : list T, Vl (map inj_gen u) ≡ u.
+  Lemma Vf_inj_gen : forall u : list T, Vf (map inj_gen u) = u.
   Proof.
     intro.
     induction u.
     - reflexivity.
     - simpl.
+      rewrite Vf_cons.
       rewrite IHu.
       reflexivity.
   Qed.
@@ -709,7 +681,7 @@ Section Definition_Inductive_Locale.
       apply le_refl.
       intros.
       apply cr_refl.
-      apply map_in.
+      apply map_in with (Qeq := (=)).
       + unfold Proper, respectful. intros.
         rewrite H0. reflexivity.
       + assumption.
@@ -737,25 +709,48 @@ Section Definition_Inductive_Locale.
 
   Definition Rmsl := @dl_msl R Rle RDistrLat.
   Definition Rpo := @msl_preorder R Rle Rmsl.
+  Instance FeqR_equivalence : Equivalence Feq := (Feq_equivalence Rpo).
+  Existing Instance FeqT_equivalence.
   Variable f : T -> R.
   Variable mslmorph : MSLMorphism Tmsl Rmsl f.
   Existing Instance mslmorph.
 
   (** We assume that the morphism respects the axioms
-      we have used to generate our free frame. *)
+      we have used to generate our free DL. *)
   Definition respects_axioms : Prop :=
     forall t : T, forall i : Idx t, f t ≤ Vf (map f (CovAx t i)).
   Variable resp_ax : respects_axioms.
 
-  (** We define a function from our free frame to R. *)
-  Definition fframe_ext (x : list T) : R :=
+  (** We define a function from our free DL to R. *)
+  Definition fdl_ext (x : list T) : R :=
     Vf (map f x).
 
-  (* We show that this function is a frame morphism. *)
+  (* We show that this function is a DL morphism. *)
   Existing Instance Covrel_le.
 
-  (*
-  Lemma f_covrel : forall a U, a ◁ U -> f a ≤ Vf (map f U).
+
+  
+  Lemma eqlist_map_map : forall a l,
+                           eqlistA Feq (map (fun x => f (a ⊓ x)) l)
+                                   (map (meet (f a)) (map f l)).
+  Proof.
+    intros.
+    induction l.
+    + simpl.
+      apply eqlistA_nil.
+    + apply eqlistA_cons.
+      apply mslmorph.
+      apply IHl.
+  Qed.
+
+  Lemma f_proper : Proper ((=) ==> (=)) f.
+  Proof.
+    intros.
+    apply pomorphism_proper.
+    apply (mslmorph_pomorph Tmsl Rmsl).
+  Qed.
+  
+Lemma dl_covrel : forall a U, a ◁ U -> f a ≤ Vf (map f U).
   Proof.
     intros.
     induction H.
@@ -764,127 +759,161 @@ Section Definition_Inductive_Locale.
       apply @bot_le.
       exact mslmorph.
     - apply Vf_in_le.
-      (* TODO *)
-
-      rewrite <- H.
-      assert (f (U n) = (f ∘ U) n) by reflexivity.
-      rewrite H0 ; apply v_le.
+      apply map_in with (Qeq := (=)).
+      apply f_proper.
+      assumption.
     - unfold respects_axioms in resp_ax.
       specialize (resp_ax b i).
-      set (K := (V (fun n => f (a ⊓ CovAx b i n)))).
+      set (K := Vf (map (fun x => f (a ⊓ x)) (CovAx b i))).
       apply le_trans with (y := K).
-      + assert (K = f a ⊓ V (f ∘ CovAx b i)).
-        * rewrite cdistr.
-          apply V_morphism ; intro.
-          unfold compose.
-          rewrite mslmorph_meet.
-          reflexivity.
-          apply mslmorph.
-        * rewrite H2.
-          apply le_trans with (y := f a ⊓ f b).
-          assert (f a ≤ f b) by (apply (pomorph_le a b H)).
-          assert (f a ⊓ f b = f a) by (apply order_meet ; assumption).
-          rewrite H4.
-          apply le_refl.
-          apply meet_le.
-          apply le_refl.
-          assumption.
-      + unfold K.
-        apply v_univ.
+      + assert (K = f a ⊓ Vf (map f (CovAx b i))).
+        rewrite Vf_meet.
+        unfold K.
+        apply Vf_proper.
+        apply eqlistA_equivlistA.
+        apply (Feq_equivalence msl_preorder).
+        apply eqlist_map_map.
+        rewrite H2.
+        rewrite order_then_meet.
+        apply le_refl.
+        apply le_trans with (y := f b).
+        apply pomorph_le.
         assumption.
+        assumption.
+      + unfold K.
+        apply Vf_univ.
+        intros.
+        apply in_map with (Qeq := Feq) in H2.
+        destruct H2.
+        destruct H2.
+        rewrite H3.
+        apply H1.
+        assumption.
+        exact FeqT_equivalence.
     - apply le_trans with (y := f b).
-      assert (f a ≤ f b) by (apply (pomorph_le a b H)).
-      assumption. assumption.
+      apply pomorph_le ; assumption.
+      assumption.
   Qed.
 
-  Instance fframe_mor : FMorphism FFrame RFrame fframe_ext.
+  Lemma fdl_pomorph : POMorphism fdl_ext.
   Proof.
-    unfold fframe_ext.
-    apply MkFMorphism.
-    
+    apply MkPOMorphism.
+    intros.
+    apply Vf_univ ; intros.
+    apply in_map with (Qeq := Feq) in H0.
+    destruct H0 ; destruct H0.
+    unfold le, Covrel in H.
+    specialize (H x1).
+    rewrite H1.
+    apply dl_covrel.
+    apply (H H0).
+    exact FeqT_equivalence.
+  Qed.
+  
+  Instance fdl_mor : DLMorphism FDistrLat RDistrLat fdl_ext.
+  Proof.
+    apply MkDLMorphism.
     - apply MkMSLMorphism.
-      + apply MkPOMorphism.
-        intros.
-        apply v_univ ; intro.
-        unfold compose.
-        unfold le, Covrel in H.
-        specialize (H n).
-        apply f_covrel ; assumption.
+      + apply fdl_pomorph.
       + intros.
-        unfold meet, msl_meet, FFrame. simpl.
-        unfold CMeet, compose.
-        assert (forall n, f (x (bijNN1 n) ⊓ y (bijNN2 n)) = f (x (bijNN1 n)) ⊓ f (y (bijNN2 n))).
-        intro.
-        apply (@mslmorph_meet T R Tle Rle Tmsl Rmsl f mslmorph).
-        setoid_rewrite H.
-        symmetry.
-        apply V_meet.
-
-      + unfold compose.
-        unfold bottom, msl_bot, FFrame, Bot. simpl.
-        assert (pointwise_relation nat Feq (fun _ => f ⊥) (fun _ => ⊥)).
-        unfold pointwise_relation ; intro.
-        apply mslmorph_bot. assumption.
-        rewrite H.
-        apply V_bot.
-
-      + unfold compose.
-        unfold top, msl_top, FFrame. simpl.
-        rewrite V_top. reflexivity.
-        exists O. unfold Top. apply mslmorph_top.
-        apply mslmorph.
-
-    - intro.
-      unfold compose.
-      rewrite <- V_pair.
-      apply V_morphism ; intro.
-      unfold V, FFrame, Vc, bijNN1, bijNN2.
+        split.
+        * apply meet_univ ;
+          apply fdl_pomorph.
+          apply meet_l.
+          apply meet_r.
+        * unfold fdl_ext.
+          induction x ; simpl.
+          rewrite Vf_nil.
+          meetsemilattice.
+          apply le_refl.
+          rewrite Vf_cons.
+          rewrite meet_comm.
+          rewrite bdistr_eq.
+          rewrite meet_comm in IHx.
+          unfold meet, msl_meet, CMeet, list_prod.
+          simpl.
+          rewrite fold_left_concat.
+          rewrite map_app.
+          rewrite Vf_app.
+          apply join_le.
+          rewrite map_map.
+          set (K := Vf (map (fun x : T => f (a ⊓ x)) y)).
+          assert ((f a) ⊓ (Vf (map f y)) = K).
+          rewrite Vf_meet.
+          unfold K.
+          apply Vf_proper.
+          symmetry.
+          apply eqlistA_equivlistA.
+          exact FeqR_equivalence.
+          apply eqlist_map_map.
+          rewrite <- H.
+          rewrite meet_comm.
+          apply le_refl.
+          apply IHx.
+      + unfold fdl_ext. simpl.
+        apply Vf_nil.
+      + unfold fdl_ext, Vf ; simpl.
+        rewrite mslmorph_top.
+        rewrite join_bot_l.
+        reflexivity.
+        assumption.
+    - intros.
+      unfold fdl_ext.
+      rewrite <- Vf_app.
+      rewrite <- map_app.
       reflexivity.
   Qed.
   
-  Definition fframe_mslmorph := fmorph_mslmorph FFrame RFrame fframe_ext.
-  Proposition fframe_factoring : fframe_ext ∘ inj_gen = f.
+  Definition fdl_mslmorph := dlmorph_mslmorph FDistrLat RDistrLat fdl_ext.
+  Proposition fdl_factoring : fdl_ext ∘ inj_gen = f.
   Proof.
     unfold equiv, ext_equiv, respectful.
     intros.
-    unfold inj_gen, fframe_ext, compose.
-    rewrite <- H.
-    apply V_const.
+    unfold inj_gen, fdl_ext, compose.
+    unfold Vf. simpl.
+    rewrite join_bot_l.
+    apply f_proper.
+    assumption.
   Qed.
 
-  Arguments fframe_factoring : default implicits.
+  Arguments fdl_factoring : default implicits.
 
   (* Now the uniqueness part of the universality:
      if we have another such frame morphism,
-     then it is equal to fframe_ext *)
+     then it is equal to fdl_ext *)
 
   Variable other_fact : (list T) -> R.
-  Variable other_morph : FMorphism FFrame RFrame other_fact.
+  Variable other_morph : DLMorphism FDistrLat RDistrLat other_fact.
   Existing Instance other_morph.
-  Instance other_mslmorph : MSLMorphism MSL_for_FFrame Rmsl other_fact := fmorph_mslmorph FFrame RFrame other_fact.
+  Instance other_mslmorph : MSLMorphism MSL_for_FDistrLat Rmsl other_fact := dlmorph_mslmorph FDistrLat RDistrLat other_fact.
   Instance other_morph_po : POMorphism other_fact.
   Proof.
-    apply (mslmorph_pomorph MSL_for_FFrame Rmsl).
+    apply (mslmorph_pomorph MSL_for_FDistrLat Rmsl).
   Qed.    
     
   Variable other_commutes : other_fact ∘ inj_gen = f.
 
   Existing Instance Covrel_le.
-  Instance coveq_R : Equiv (nat -> R) := @ext_equiv nat (≡) R (=).
+  (*  Instance coveq_R : Equiv (nat -> R) := @ext_equiv nat (≡) R (=).*)
+
   
-  Proposition other_fact_equal : forall u, other_fact u = fframe_ext u.
+  Proposition other_fact_equal : forall u, other_fact u = fdl_ext u.
   Proof.
     intro.
-    assert (other_fact u = other_fact (V (fun n => inj_gen (u n)))).
-    rewrite V_inj_gen ; reflexivity.
+    assert (other_fact u = other_fact (Vf (map inj_gen u))).
+    rewrite Vf_inj_gen ; reflexivity.
     rewrite H.
-    rewrite morph_V.
-    unfold fframe_ext, compose.
-    apply V_morphism.
-    intro.
-    unfold equiv, ext_equiv, respectful in other_commutes.
-    apply other_commutes ; reflexivity.
+    rewrite morph_Vf.
+    rewrite map_map.
+    unfold compose in other_commutes.
+    assert (pointwise_relation T Feq (fun x => other_fact (inj_gen x)) f).
+    unfold pointwise_relation ; intro.
+    apply other_commutes.
+    reflexivity.
+    rewrite H0.
+    unfold fdl_ext.
+    reflexivity.
     assumption.
   Qed.
- *)
+
 End Definition_Inductive_Locale.

@@ -3,6 +3,7 @@ Require Import MyNotations.
 Require Import PreorderEquiv.
 Require Import Coq.Lists.List.
 Require Import Coq.Lists.SetoidList.
+Require Import EquivlistMap.
 
 (** * Definition of distributive lattices
     They are meet semilattices
@@ -164,6 +165,11 @@ Section DistrLattice_Def.
   Definition Vf l :=
     fold_left (fun accu x => accu ⊔ x) l ⊥.
 
+  Lemma Vf_nil : Vf [] = ⊥.
+  Proof.
+    reflexivity.
+  Qed.
+
   Lemma Vf_singleton : forall a, Vf [a] = a.
   Proof.
     intros. unfold Vf. simpl. rewrite join_bot_l.
@@ -196,6 +202,19 @@ Section DistrLattice_Def.
       apply H.
   Qed.
 
+  Lemma Vf_meet : forall a b, a ⊓ Vf b = Vf (map (a ⊓) b).
+  Proof.
+    intro.
+    induction b ; simpl.
+    - rewrite Vf_nil.
+      meetsemilattice.
+    - rewrite Vf_cons.
+      rewrite bdistr_eq.
+      rewrite Vf_cons.
+      rewrite IHb.
+      reflexivity.
+   Qed.
+
   Lemma Vf_app : forall a b, Vf (a ++ b) = Vf a ⊔ Vf b.
   Proof.
     induction a ; intros.
@@ -222,6 +241,44 @@ Section DistrLattice_Def.
       assumption.
       apply join_r.
   Qed.
+
+  Lemma Vf_univ : forall U y, (forall x, x ∈ U -> x ≤ y) -> Vf U ≤ y.
+  Proof.
+    intros.
+    induction U.
+    + rewrite Vf_nil.
+      apply bot_le.
+    + rewrite Vf_cons.
+      apply join_univ.
+      apply H.
+      apply InA_cons_hd.
+      reflexivity.
+      apply IHU.
+      intros.
+      apply H.
+      apply InA_cons_tl.
+      apply H0.
+  Qed.
+
+  Lemma Vf_incl : forall U V, inclA Feq U V -> Vf U ≤ Vf V.
+  Proof.
+    intros.
+    apply Vf_univ.
+    intros.
+    apply Vf_in_le.
+    apply H.
+    apply H0.
+  Qed.
+
+  Lemma Vf_proper : forall U V, equivlistA Feq U V -> Vf U = Vf V.
+  Proof.
+    intros.
+    split ; (
+      apply Vf_incl ;
+      unfold inclA ; intros ;
+      apply H ; assumption).
+  Qed.
+
   
 End DistrLattice_Def.
 
@@ -230,6 +287,89 @@ Proof.
   apply join_morphism_Proper.
 Qed.
 
+Add Parametric Morphism (T : Type) (Tle : Le T) (Tdl : DistrLattice Tle) : (@Vf T Tle Tdl) with signature (equivlistA Feq ==> Feq) as Vf_morphism.
+Proof.
+  apply Vf_proper.
+Qed.
+
+
+Add Parametric Morphism (T : Type) (R : Type) (Req : relation R) (Requiv : Equivalence Req) : (@map T R) with signature (pointwise_relation T Req  ==> equivlistA (≡) ==> equivlistA Req) as map_morphism.
+Proof.
+  unfold equivlistA ; intros.
+  set (L := @inA_map_iff T (≡) _ R Req Requiv).
+  assert (forall f : T -> R, Proper ((≡) ==> Req) f).
+  unfold Proper, respectful. intros. subst. reflexivity.
+  unfold contains, in_containsR, in_containsQ in L.
+  rewrite L.
+  rewrite L.
+  split.
+  - intro.
+    destruct H2.
+    exists x2.
+    destruct H2.
+    split.
+    + rewrite <- H0.
+      apply H2.
+    + rewrite H3.
+      apply H.
+  - intro.
+    destruct H2.
+    exists x2.
+    destruct H2.
+    split.
+    + rewrite H0.
+      apply H2.
+    + rewrite H3.
+      symmetry.
+      apply H.
+  - apply H1.
+  - apply H1.
+Qed.
+
 (** * Distributive lattice morphisms *)
 
-(* TODO *)
+Section Frame_Morphism_Definition.
+  Context {tA : Type}.
+  Context {leA : Le tA}.
+  Existing Instance Feq_equiv.
+  
+  Context {tB : Type}.
+  Context {leB : Le tB}.
+
+  Require Import Coq.Program.Basics.
+
+  Variable (DLA : @DistrLattice tA leA).
+  Variable (DLB : @DistrLattice tB leB).
+
+  Definition mslA := @dl_msl tA leA DLA.
+  Definition mslB := @dl_msl tB leB DLB.
+
+  Variable (f : tA -> tB).
+  Class DLMorphism :=
+    MkDLMorphism
+      {
+        dlmorph_mslmorph :> MSLMorphism mslA mslB f;
+        (* preserves countable joins *)
+        morph_join: forall a b, f (a ⊔ b) = (f a) ⊔ (f b)
+      }.
+
+  Variable dlmorph : DLMorphism.
+  Existing Instance dlmorph.
+
+  Proposition morph_Vf : forall a, f (Vf a) = Vf (map f a).
+  Proof.
+    induction a.
+    - simpl.
+      rewrite Vf_nil.
+      rewrite Vf_nil.
+      apply mslmorph_bot.
+      apply dlmorph_mslmorph.
+    - simpl.
+      rewrite Vf_cons.
+      rewrite Vf_cons.
+      rewrite morph_join.
+      rewrite IHa.
+      reflexivity.
+  Qed.
+
+End Frame_Morphism_Definition.
