@@ -362,7 +362,7 @@ Section Frame_Morphism_Definition.
   Class FMorphism :=
     MkFMorphism
       {
-        fmorph_mslmorph : MSLMorphism mslA mslB f;
+        fmorph_mslmorph :> MSLMorphism mslA mslB f;
         (* preserves countable joins *)
         morph_V: forall u : nat -> tA, f (V u) = V (f ∘ u)
       }.
