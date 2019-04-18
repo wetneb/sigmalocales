@@ -123,6 +123,34 @@ Section PreorderMorphism.
 
 End PreorderMorphism.
 
+Section PreorderMorphism2.
+  Context {T1 T2 T3 : Type}.
+  Context {le1 : Le T1}.
+  Context {le2 : Le T2}.
+  Context {le3 : Le T3}.
+
+  Variable (po1 : Preorder le1).
+  Variable (po2 : Preorder le2).
+  Variable (po3 : Preorder le3).
+
+  Class POMorphism2 (f : T1 -> T2 -> T3) :=
+    MkPOMorphism2
+      {
+        pomorph2_le : forall x y a b, x ≤ y -> a ≤ b -> f x a ≤ f y b
+      }.
+
+  Variable f : T1 -> T2 -> T3.
+  Variable pom : POMorphism2 f.
+
+  Proposition pomorphism2_proper : Proper (Feq ==> Feq ==> Feq) f.
+  Proof.
+    unfold Proper, respectful, Feq.
+    intros. destruct H, H0.
+    split ; apply pomorph2_le ; assumption.
+  Qed.
+
+End PreorderMorphism2.
+
 Add Parametric Morphism T1 T2 (le1 : Le T1) (le2 : Le T2) (f : T1 -> T2) (fm : POMorphism f): f with signature (Feq ==> Feq) as fm_morphism.
 Proof.
   apply pomorphism_proper ; assumption.
