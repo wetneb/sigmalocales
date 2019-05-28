@@ -1,10 +1,10 @@
 
-Require Import MyNotations.
 Require Import Peano.
 Require Import QArith.
 Require Import ZArith.BinInt.
 Require Import Lia.
 Require Import PreorderEquiv.
+Require Import MyNotations.
 
 Section MonotoneSeq.
 
@@ -21,8 +21,7 @@ Section MonotoneSeq.
 End MonotoneSeq.
 
 Section LeftReals.
-  Instance q_le : Le Q := Qle.
-  Instance q_equiv : Equiv Q := Qeq.
+  
   Definition LReal := MonotoneSeq.
 
   Definition Qpos := { q : Q | 0 < q }.
@@ -32,9 +31,9 @@ Section LeftReals.
 
   Instance LRle_le : Le LReal := LRle.
 
-  Lemma LRle_refl : forall x : LReal, LRle x x.
+  Lemma LRle_refl : forall x : LReal, x ≤ x.
   Proof.
-    unfold LRle ; intros.
+    unfold "≤", LRle_le, LRle ; intros.
     exists n.
     apply Qlt_le_weak.
     rewrite <- Qplus_0_r at 1.
@@ -46,7 +45,7 @@ Section LeftReals.
 
   Lemma Q_times_two : forall x : Q, x + x = x * inject_Z 2.
   Proof.
-    intros. unfold Qplus, Qmult.
+    intros. unfold plus, mult, q_plus, q_mult, Qplus, Qmult.
     rewrite <- Zmult_plus_distr_r.
     unfold equiv, q_equiv, Qeq.
     simpl. rewrite Zpos_plus_distr.
@@ -76,9 +75,9 @@ Section LeftReals.
     rewrite Qmult_0_l. assumption.
   Qed.
 
-  Lemma LRle_trans : forall x y z, LRle x y -> LRle y z -> LRle x z.
+  Lemma LRle_trans : forall x y z : LReal, x ≤ y -> y ≤ z -> x ≤ z.
   Proof.
-    unfold LRle ; intros.
+    unfold "≤", LRle_le, LRle ; intros.
     set (u := Qhalf ϵ).
     pose proof (Qhalf_split ϵ) as Hsplit.
     - assert (0 < u).
@@ -176,9 +175,9 @@ Section LeftReals.
   Definition LRzero : LReal := Q_to_LR 0.
   Instance LRzero_zero : Zero LReal := LRzero.
 
-  Lemma LRplus_0_l : forall x : LReal, LRplus LRzero x = x.
+  Lemma LRplus_0_l : forall x : LReal, 0 + x = x.
   Proof.
-    unfold LRplus, LRzero, "=", LRequiv, Feq, "≤", LRle_le, LRle. intros.
+    unfold "+", "0", LRplus, LRzero, "=", LRequiv, Feq, "≤", LRle_le, LRle. intros.
     simpl. split ; intros ; exists n ; rewrite Qplus_0_l ;
              apply Qlt_le_weak ; rewrite Qplus_comm ;
                rewrite <- (Qplus_0_l ((`x) n)) at 1 ;
