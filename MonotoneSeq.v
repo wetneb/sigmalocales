@@ -173,23 +173,59 @@ Section LeftReals.
   Qed.
 
   Definition LRzero : LReal := Q_to_LR 0.
-  Instance LRzero_zero : Zero LReal := LRzero.
+  Instance LRzero_zero : Zero LReal := LRzero.    
+
+  Lemma Qle_Qplus_Qpos : forall x ϵ : Q, 0 < ϵ -> x ≤ x + ϵ.
+  Proof.
+    intros.
+    unfold "+", q_plus.
+    apply Qlt_le_weak.
+    rewrite <- (Qplus_0_l x) at 1.
+    rewrite (Qplus_comm x).
+    apply Qplus_lt_le_compat.
+    assumption.
+    apply Qle_refl.
+  Qed.
+
+  Lemma Qeq_LReq : forall x y : LReal, (forall n, (` x) n = (` y) n) -> x = y.
+  Proof.
+    intros.
+    unfold "=", LRequiv, Feq, "≤", LRle_le, LRle.
+    split ; intros ; exists n ; 
+    rewrite (H n); apply Qle_Qplus_Qpos ;
+      assumption.
+  Qed.
 
   Lemma LRplus_0_l : forall x : LReal, 0 + x = x.
   Proof.
-    unfold "+", "0", LRplus, LRzero, "=", LRequiv, Feq, "≤", LRle_le, LRle. intros.
-    simpl. split ; intros ; exists n ; rewrite Qplus_0_l ;
-             apply Qlt_le_weak ; rewrite Qplus_comm ;
-               rewrite <- (Qplus_0_l ((`x) n)) at 1 ;
-               apply Qplus_lt_le_compat.
-    assumption.
-    apply Qle_refl.
-    assumption.
-    apply Qle_refl.
-  Qed.         
+    intros.
+    apply Qeq_LReq.
+    intros.
+    simpl.
+    apply Qplus_0_l.
+  Qed.
+
+  Lemma LRplus_comm : forall x y : LReal, x + y = y + x.
+  Proof.
+    intros ; apply Qeq_LReq ; intros.
+    simpl. apply Qplus_comm.
+  Qed.
+
+  Lemma LRplus_0_r : forall x : LReal, x + 0 = x.
+  Proof.
+    intros.
+    rewrite LRplus_comm.
+    apply LRplus_0_l.
+  Qed.
+
+  Lemma LRplus_assoc : forall x y z : LReal, x + (y + z) = (x + y) + z.
+  Proof.
+    intros ; apply Qeq_LReq ; intros.
+    simpl. apply Qplus_assoc.
+  Qed.
   
 End LeftReals.
-      
+
       
     
   
