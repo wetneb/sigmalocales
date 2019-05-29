@@ -4,12 +4,16 @@ Require Import QArith.
 Require Import ZArith.BinInt.
 Require Import Lia.
 Require Import PreorderEquiv.
+Require Import JoinSemiLattice.
+Require Import BijNat.
+Require Import Rationals.
 Require Import MyNotations.
 
 Section MonotoneSeq.
 
   Context {T: Type}.
   Context {Tle : Le T}.
+  Context {TJSL : JoinSemiLattice Tle}.
 
   Instance nat_le : Le nat := Peano.le.
 
@@ -17,7 +21,39 @@ Section MonotoneSeq.
     forall n m : nat, n ≤ m -> f n ≤ f m.
 
   Definition MonotoneSeq := { f : nat -> T | monotone f }.
+
+  Definition monotone_incr (f : nat -> T) : Prop :=
+    forall n : nat, f n ≤ f (S n).
+
+  Lemma monotone_equiv : forall f, monotone f <-> monotone_incr f.
+  Proof.
+    intros; unfold monotone, monotone_incr; split ; intros.
+    - apply (H n (S n)).
+      apply le_S. reflexivity.
+    - induction H0.
+      * apply le_refl.
+      * apply (le_trans _ (f m) _).
+        assumption.
+        apply H.
+  Qed.
   
+  (** Iterated suprema of a sequence **)
+
+  Variable f : nat -> T.
+  Fixpoint sup_def (n : nat) : T :=
+    match n with
+    | O => f O
+    | S n => f (S n) ⊔ sup_def n
+    end.
+
+  Lemma sup_monotone : monotone sup_def.
+  Proof.
+    rewrite monotone_equiv.
+    unfold monotone_incr.
+    intro. simpl.
+    apply join_r.
+  Qed.
+
 End MonotoneSeq.
 
 Section LeftReals.
@@ -27,8 +63,8 @@ Section LeftReals.
   Definition Qpos := { q : Q | 0 < q }.
 
   Definition LRle (x y : LReal)  :=
-    forall ϵ : Q, ϵ > 0 -> forall n : nat, exists m : nat, (proj1_sig x) n ≤ (proj1_sig y) m + ϵ .
-
+    forall ϵ : Q, ϵ > 0 -> forall n : nat, exists m : nat, (` x) n ≤ (` y) m + ϵ .
+  
   Instance LRle_le : Le LReal := LRle.
 
   Lemma LRle_refl : forall x : LReal, x ≤ x.
@@ -223,7 +259,29 @@ Section LeftReals.
     intros ; apply Qeq_LReq ; intros.
     simpl. apply Qplus_assoc.
   Qed.
+
+  (* Countable supremum *)
+
+  Existing Instance q_le.
+  Existing Instance q_JSL.
   
+  Definition LRsup_def (f : nat -> LReal) : nat -> Q :=
+    sup_def (fun n => (` (f (bijNN1 n))) (bijNN2 n)).
+
+  Lemma LRsup_defined : forall f, monotone (LRsup_def f).
+  Proof.
+    intros.
+    unfold LRsup_def.
+    apply sup_monotone.
+  Qed.
+
+  Definition LRsup (f : nat -> LReal) : LReal :=
+    exist monotone (LRsup_def f) (LRsup_defined f).
+
+  Lemma LRsup_point : forall f : nat -> LReal, forall n : nat, f n ≤ LRsup f.
+  Proof.
+    intros.
+    unfold le.
 End LeftReals.
 
       
