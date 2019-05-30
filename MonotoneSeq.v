@@ -46,6 +46,30 @@ Section MonotoneSeq.
     | S n => f (S n) ⊔ sup_def n
     end.
 
+  Lemma sup_def_point : forall n : nat, f n ≤ sup_def n.
+  Proof.
+    intros.
+    destruct n ; simpl.
+    - apply le_refl.
+    - apply join_l.
+  Qed.
+
+  Lemma sup_def_univ : forall n : nat, forall t : T, (forall m, m ≤ n -> f m ≤ t) -> sup_def n ≤ t.
+  Proof.
+    induction n ; intros.
+    - apply (H 0).
+      reflexivity.
+    - simpl.
+      apply join_univ.
+      apply (H (S n)).
+      reflexivity.
+      apply IHn.
+      intros.
+      apply H.
+      apply le_S.
+      assumption.
+  Qed.
+
   Lemma sup_monotone : monotone sup_def.
   Proof.
     rewrite monotone_equiv.
@@ -280,8 +304,48 @@ Section LeftReals.
 
   Lemma LRsup_point : forall f : nat -> LReal, forall n : nat, f n ≤ LRsup f.
   Proof.
+    unfold le, LRle_le, LRle.
     intros.
-    unfold le.
+    exists (bijNN (n,n0)).
+    apply le_trans with (y := ((` (LRsup f)) (bijNN (n, n0)))).
+    unfold LRsup, LRsup_def. simpl.
+    set (fun n1 => (` (f (bijNN1 n1)) (bijNN2 n1))).
+    apply le_trans with (y := q (bijNN (n,n0))).
+    unfold q.
+    rewrite bijNN1_eq, bijNN2_eq. simpl.
+    apply le_refl.
+    apply sup_def_point.
+    apply Qle_Qplus_Qpos.
+    assumption.
+  Qed.
+  Existing Instance nat_le.
+              
+  Lemma LRsup_univ : forall f : nat -> LReal, forall z : LReal, (forall n, f n ≤ z) -> LRsup f ≤ z.
+  Proof.
+    unfold le, LRle_le, LRle.
+    intro. intro.
+    induction n ; simpl.
+    - apply (H (bijNN1 0) ϵ H0 (bijNN2 0)).
+    - destruct IHn.
+      specialize (H (bijNN1 (S n)) ϵ H0 (bijNN2 (S n))).
+      destruct H.
+      set (Peano.max x x0) as y.
+      exists y.
+      apply (@join_univ Q q_le q_JSL).
+      apply (le_trans _ ((` z) x0 + ϵ) _).
+      assumption.
+      apply Qplus_le_compat.
+      apply (proj2_sig z).
+      apply Max.le_max_r.
+      apply le_refl.
+      apply (le_trans _ ((` z) x + ϵ) _).
+      assumption.
+      apply Qplus_le_compat.
+      apply (proj2_sig z).
+      apply Max.le_max_l.
+      apply le_refl.
+  Qed.
+    
 End LeftReals.
 
       
